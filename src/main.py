@@ -4,10 +4,13 @@ import landauer.evaluate as evaluate
 import landauer.naive as naive
 import landauer.framework as framework
 import landauer.graph as graph
+import networkx as nx
 import random
 
+def calc_delay(aig):
+    return len(nx.dag_longest_path(aig)) - 1
 
-def genetic_algorithm(circuit_description, w_energy, w_delay):
+def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
 
     # Valida entradas
     if w_delay + w_energy != 1:
@@ -21,8 +24,7 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
 
     # Calcula energia e profundidade iniciais
     initial_energy = evaluate.evaluate(aig, simulation)['total']
-    initial_delay = 5 # TODO: Calcular delay da solucao
-
+    initial_delay = calc_delay(aig)
 
     # Retorna populacao inicial
     def initial_population(aig, n_individuals = 4):
@@ -42,8 +44,8 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
         for i in range(0, n_children):
             
             # Escolhe os pais
-            total = sum(scores)
-            weights = list(map(lambda s: s / total, scores))
+            min_score = min(scores)
+            weights = list(map(lambda s: s - min_score + 1, scores))            
             parents = random.choices(population, weights=weights, k=2)
 
             # Recombina os genes
@@ -81,8 +83,8 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
             evaluation = evaluate.evaluate(forwarding_, simulation)
 
             # Calcula score de energia e delay
-            energy_score = evaluation['total'] #(evaluation['total'] - initial_energy) / initial_energy
-            delay_score = (5 - initial_delay) / initial_delay # TODO: Calcular delay da solucao
+            energy_score = 1 - (evaluation['total'] / initial_energy)
+            delay_score = 1 - (calc_delay(forwarding_) / initial_delay)
 
             # Retorna os scores ponderados com os pesos
             scores.append((energy_score * w_energy) + (delay_score * w_delay))
@@ -92,7 +94,7 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
     def natural_selection(population, scores):
         half_index = int(len(population) / 2)
         list_ = sorted(zip(scores, population), key=lambda x: x[0])
-        list_ = list_[:half_index]
+        list_ = list_[half_index:]
         return [p for s, p in list_], [s for s, p in list_]
 
     # Passo 1 - Definir a população inicial
@@ -104,7 +106,7 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
     print('Initial scores')
     print(scores)
 
-    for i in range(0, 10):
+    for i in range(0, n_generations):
         # Reprodução
         new_generation = reproduce(population, scores)
 
@@ -120,8 +122,12 @@ def genetic_algorithm(circuit_description, w_energy, w_delay):
 
         print(scores)
 
+    max_score = max(scores)
+    max_score_i = scores.index(max_score)
+    return population[max_score_i]
 
-def main():
+
+def half_adder():
 
     half_adder = '''
         module half_adder (a, b, sum, cout);
@@ -135,10 +141,10 @@ def main():
     aig = parse.parse(half_adder)
     simulation = simulate.simulate(aig)
 
-    genetic_algorithm(half_adder, 1, 0)
+    best_assignment = genetic_algorithm(half_adder, 0.5, 0.5, 10)
 
-    # framework.colorize(result)
-    # print(result)
-    # graph.show(graph.default(result))
+    result = framework.forwarding(aig, best_assignment)
+    framework.colorize(result)
+    graph.show(graph.default(result))
 
-main()
+half_adder()
