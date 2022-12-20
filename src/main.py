@@ -6,18 +6,16 @@ import landauer.framework as framework
 import landauer.graph as graph
 import networkx as nx
 import random
+import json
 
 def calc_delay(aig):
-    return len(nx.dag_longest_path(aig)) - 1
+    return len(nx.dag_longest_path(aig)) - 2
 
-def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
+def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
 
     # Valida entradas
     if w_delay + w_energy != 1:
         raise ValueError("A soma dos pesos deve ser igual a 1")
-
-    # Converte circuito em grafo de porta AND
-    aig = parse.parse(circuit_description)
 
     # Simula circuito
     simulation = simulate.simulate(aig)
@@ -26,8 +24,12 @@ def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
     initial_energy = evaluate.evaluate(aig, simulation)['total']
     initial_delay = calc_delay(aig)
 
+    print('Initials')
+    print(initial_energy)
+    print(initial_delay)
+
     # Retorna populacao inicial
-    def initial_population(aig, n_individuals = 4):
+    def initial_population(aig, n_individuals = 8):
         assignment = framework.assignment(aig)
         population = []
 
@@ -43,7 +45,7 @@ def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
 
         for i in range(0, n_children):
             
-            # Escolhe os pais
+            # Escolhe os parentes
             min_score = min(scores)
             weights = list(map(lambda s: s - min_score + 1, scores))            
             parents = random.choices(population, weights=weights, k=2)
@@ -64,9 +66,9 @@ def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
         return children
 
     # Aplica mutacao nos individuos de uma populacao
-    def mutate(population, rate = 0.05):        
+    def mutate(population, rate = 0.2):        
         for i in population:
-            should_mutate = random.choices((True, False), weights=(rate, 1 - rate), k=1)
+            [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
             if should_mutate:
                 gate, input_ = random.choice(list(i.keys()))
                 candidates = list(framework.candidates(aig, i, gate, input_))
@@ -120,7 +122,7 @@ def genetic_algorithm(circuit_description, w_energy, w_delay, n_generations):
         # Seleciona os mais aptos
         population, scores = natural_selection(population, scores)
 
-        print(scores)
+        print(max(scores))
 
     max_score = max(scores)
     max_score_i = scores.index(max_score)
@@ -139,12 +141,54 @@ def half_adder():
         endmodule
     '''
     aig = parse.parse(half_adder)
-    simulation = simulate.simulate(aig)
-
-    best_assignment = genetic_algorithm(half_adder, 0.5, 0.5, 10)
+    
+    best_assignment = genetic_algorithm(aig, 0.5, 0.5)
 
     result = framework.forwarding(aig, best_assignment)
     framework.colorize(result)
     graph.show(graph.default(result))
+
+    print(best_assignment)
+
+
+def test_designs():
+    
+    designs = ['epfl_testa_ctrl.json', 'epfl_testa_int2float.json', 'epfl_testa_dec.json', 'epfl_testa_cavlc.json']
+
+    param_map = [
+        {
+            'name': 'Energy',
+            'w_energy': 1,
+            'w_delay': 0,
+        },
+        {
+            'name': 'Mix',
+            'w_energy': 0.5,
+            'w_delay': 0.5,
+        }
+    ]
+
+
+    for filename in designs:
+        f = open('./designs/' + filename)
+        aig = parse.deserialize(f.read())
+        simulation = simulate.simulate(aig)
+
+        initial_energy = evaluate.evaluate(aig, simulation)['total']
+        initial_delay = calc_delay(aig)
+
+        print(filename)
+
+        for params in param_map:
+            best_assignment = genetic_algorithm(aig, params['w_energy'], params['w_delay'])
+            forwarding = framework.forwarding(aig, best_assignment)    
+            evaluation = evaluate.evaluate(forwarding, simulation)
+
+            energy_score = 1 - (evaluation['total'] / initial_energy)
+            delay_score = 1 - (calc_delay(forwarding) / initial_delay)
+
+            print(params['name'])
+            print('Energy: ' + str(energy_score))
+            print('Delay: ' + str(delay_score))
 
 half_adder()
