@@ -55,7 +55,7 @@ def test_designs():
         simulation = simulate.simulate(aig)
 
         initial_energy = evaluate.evaluate(aig, simulation)['total']
-        initial_delay = calc_delay(aig)
+        initial_delay = ga.calc_delay(aig)
 
         print(filename)
 
@@ -65,10 +65,10 @@ def test_designs():
             evaluation = evaluate.evaluate(forwarding, simulation)
 
             energy_score = 1 - (evaluation['total'] / initial_energy)
-            delay_score = 1 - (calc_delay(forwarding) / initial_delay)
+            delay_score = 1 - (ga.calc_delay(forwarding) / initial_delay)
 
             print(params['name'])
             print('Energy: ' + str(energy_score))
             print('Delay: ' + str(delay_score))
 
-test_half_adder()
+test_designs()
