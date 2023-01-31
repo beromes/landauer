@@ -11,7 +11,7 @@ import json
 def calc_delay(aig):
     return len(nx.dag_longest_path(aig)) - 2
 
-def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
+def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10, n_initial_individuals = 8, reproduction_rate = 1, mutation_rate = 0.2):
 
     # Valida entradas
     if w_delay + w_energy != 1:
@@ -22,14 +22,14 @@ def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
 
     # Calcula energia e profundidade iniciais
     initial_energy = evaluate.evaluate(aig, simulation)['total']
-    initial_delay = calc_delay(aig)
+    # initial_delay = calc_delay(aig)
 
-    print('Energia e Delay inciais')
-    print(initial_energy)
-    print(initial_delay)
+    # print('Energia e Delay inciais')
+    # print(initial_energy)
+    # print(initial_delay)
 
     # Retorna populacao inicial
-    def initial_population(aig, n_individuals = 8):
+    def initial_population(aig, n_individuals):
         assignment = framework.assignment(aig)
         population = []
 
@@ -39,7 +39,7 @@ def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
         return population
 
     # Faz reprodução dos individuos de uma populacao
-    def reproduce(population, scores, rate = 1):
+    def reproduce(population, scores, rate):
         n_children = len(population) * rate
         children = []
 
@@ -66,7 +66,7 @@ def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
         return children
 
     # Aplica mutacao nos individuos de uma populacao
-    def mutate(population, rate = 0.2):        
+    def mutate(population, rate):        
         for i in population:
             [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
             if should_mutate:
@@ -77,19 +77,27 @@ def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
         return population
 
     # Funcao fitness
+    # def fit(population):
+    #     scores = []
+    #     for p in population:            
+    #         # Avalia individuo
+    #         forwarding_ = framework.forwarding(aig, p)
+    #         evaluation = evaluate.evaluate(forwarding_, simulation)
+
+    #         # Calcula score de energia e delay
+    #         energy_score = 1 - (evaluation['total'] / initial_energy)
+    #         delay_score = 1 - (calc_delay(forwarding_) / initial_delay)
+
+    #         # Retorna os scores ponderados com os pesos
+    #         scores.append((energy_score * w_energy) + (delay_score * w_delay))
+    #     return scores
+
     def fit(population):
         scores = []
-        for p in population:            
-            # Avalia individuo
+        for p in population:
             forwarding_ = framework.forwarding(aig, p)
             evaluation = evaluate.evaluate(forwarding_, simulation)
-
-            # Calcula score de energia e delay
-            energy_score = 1 - (evaluation['total'] / initial_energy)
-            delay_score = 1 - (calc_delay(forwarding_) / initial_delay)
-
-            # Retorna os scores ponderados com os pesos
-            scores.append((energy_score * w_energy) + (delay_score * w_delay))
+            scores.append(1 - (evaluation['total'] / initial_energy))
         return scores
 
     # Seleciona os individuos mais adaptados
@@ -100,20 +108,20 @@ def genetic_algorithm(aig, w_energy, w_delay, n_generations = 10):
         return [p for s, p in list_], [s for s, p in list_]
 
     # Passo 1 - Definir a população inicial
-    population = initial_population(aig)
+    population = initial_population(aig, n_initial_individuals)
 
     # Passo 2 - Aplicar funcao fitness na populacao inicial
     scores = fit(population)
 
-    print('Scores inicais')
-    print(scores)
+    # print('Scores inicais')
+    # print(scores)
 
     for i in range(0, n_generations):
         # Reprodução
-        new_generation = reproduce(population, scores)
+        new_generation = reproduce(population, scores, reproduction_rate)
 
         # Mutação
-        new_generation = mutate(new_generation)
+        new_generation = mutate(new_generation, mutation_rate)
 
         # Calcula score dos novos indivíduos
         scores += fit(new_generation)
