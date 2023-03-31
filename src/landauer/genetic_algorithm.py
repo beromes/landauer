@@ -7,6 +7,7 @@ import landauer.graph as graph
 import networkx as nx
 import random
 import json
+import time
 from operator import attrgetter
 
 '''
@@ -17,7 +18,7 @@ class ParamMap:
     w_energy = 1
     w_delay = 0
     n_generations = 1000
-    n_initial_individuals = 20
+    n_initial_individuals = 50
     reproduction_rate = 1.0
     mutation_rate = 0.2
 
@@ -45,6 +46,8 @@ def calc_delay(aig):
 Etapas algoritmo genetico
 '''
 def genetic_algorithm(aig, params):
+
+    prev_time = time.time()
 
     # Converte dicionario em classe
     params = ParamMap(params)
@@ -147,20 +150,36 @@ def genetic_algorithm(aig, params):
     # Passo 2 - Aplicar funcao fitness na populacao inicial
     fit(population)
 
+    print('Init population = ' + str(time.time() - prev_time))
+    prev_time = time.time()
+
     for i in range(0, params.n_generations):
         # Encontra melhor e pior
         best = max(population, key=attrgetter('score'))
         worst = min(population, key=attrgetter('score'))
         print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
+        print('Find best and worst = ' + str(time.time() - prev_time))
+        prev_time = time.time()
+
         # Reprodução
         new_generation = reproduce(population, params.reproduction_rate, worst.score)
+
+        print('Reproduce = ' + str(time.time() - prev_time))
+        prev_time = time.time()
 
         # Mutação
         new_generation = mutate(new_generation, params.mutation_rate)
 
+        print('Mutation = ' + str(time.time() - prev_time))
+        prev_time = time.time()
+
         # Calcula score dos novos indivíduos
         fit(new_generation)
+
+        print('Fit = ' + str(time.time() - prev_time))
+        prev_time = time.time()
+
         # population += new_generation
         # Seleciona os mais aptos
         # population = natural_selection(population)
@@ -169,6 +188,9 @@ def genetic_algorithm(aig, params):
         population = natural_selection(population)
         new_generation = natural_selection(new_generation)
         population += new_generation
+
+        print('Natural selection = ' + str(time.time() - prev_time))
+        prev_time = time.time()
 
 
     # Encontra melhor e pior
