@@ -24,7 +24,7 @@ class ParamMap:
     mutation_based = False
 
     def __init__(self, dictt):
-        if dictt is dict:          
+        if type(dictt) is dict:          
             for key in dictt:
                 setattr(self, key, dictt[key])
 
@@ -194,4 +194,4 @@ def genetic_algorithm(aig, params):
     worst = min(population, key=attrgetter('score'))
     print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
-    return best
+    return best.assignment

@@ -20,9 +20,20 @@ def test_half_adder():
             assign cout = a & b;
         endmodule
     '''
+
+    params = {
+        'name': 'Teste Com Reprodução',
+        'w_energy': 1,
+        'w_delay': 0,
+        'n_generations': 10,
+        'n_initial_individuals': 5,
+        'reproduction_rate': 1,
+        'mutation_rate': 0.2
+    }
+
     aig = parse.parse(half_adder)
     
-    best_assignment = ga.genetic_algorithm(aig, 0.5, 0.5)
+    best_assignment = ga.genetic_algorithm(aig, params)
     print(best_assignment)
 
     result = framework.forwarding(aig, best_assignment)
@@ -36,18 +47,32 @@ n_exec = 5
 
 def test_designs():
     
-    #designs = ['epfl_testa_ctrl.json', 'epfl_testa_int2float.json', 'epfl_testa_dec.json', 'epfl_testa_cavlc.json']
-    designs = ['epfl_testa_cavlc.json']
+    designs = [
+        'epfl_testa_ctrl.json',
+        'epfl_testa_int2float.json',
+        'epfl_testa_dec.json',
+        'epfl_testa_cavlc.json'
+    ]
 
     param_map = [
         {
-            'name': 'Energy - Light',
+            'name': 'Teste Com Reprodução',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 50,
+            'n_generations': 500,
             'n_initial_individuals': 20,
             'reproduction_rate': 1,
-            'mutation_rate': 0.1
+            'mutation_rate': 0.2
+        },
+        {
+            'name': 'Teste Sem Reprodução',
+            'w_energy': 1,
+            'w_delay': 0,
+            'n_generations': 500,
+            'n_initial_individuals': 20,
+            'reproduction_rate': 0,
+            'mutation_rate': 1,
+            'mutation_based': True
         },
     ]
 
@@ -65,7 +90,7 @@ def test_designs():
         for params in param_map:
 
             for i in range(1, n_exec):
-                best_assignment = ga.genetic_algorithm(aig, params).dna
+                best_assignment = ga.genetic_algorithm(aig, params)
                 forwarding = framework.forwarding(aig, best_assignment)    
                 evaluation = evaluate.evaluate(forwarding, simulation)
 
@@ -76,4 +101,4 @@ def test_designs():
                 print('Energy: ' + str(energy_score))
                 print('Delay: ' + str(delay_score))
 
-test_designs()
+test_half_adder()
