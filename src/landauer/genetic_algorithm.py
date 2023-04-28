@@ -29,12 +29,11 @@ class ParamMap:
                 setattr(self, key, dictt[key])
 
 class Individual:
-    dna = None
+    assignment = None
     score = 0
-    evaluation = None
 
-    def __init__(self, dna):
-        self.dna = dna
+    def __init__(self, assignment):
+        self.assignment = assignment
 
 '''
 Funcoes auxiliares
@@ -82,7 +81,7 @@ def genetic_algorithm(aig, params):
     # Funcao fitness que tenta minimizar a entropia
     def fit(population):
         for p in population:
-            forwarding_ = framework.forwarding(aig, p.dna)
+            forwarding_ = framework.forwarding(aig, p.assignment)
             evaluation = evaluate.evaluate(forwarding_, simulation)
             p.score = 1 - (evaluation['total'] / initial_energy)
 
@@ -91,44 +90,30 @@ def genetic_algorithm(aig, params):
         n_children = int(len(population) * rate)
         children = []
 
-        for i in range(0, n_children):
-            
-            #lambda_fun = lambda p: p.score - min_score + 1
-            #lambda_fun = lambda p: p.score
-            lambda_fun = lambda p: p.score / min_score
+        for i in range(0, n_children):            
 
             # Escolhe os parentes
-            weights = list(map(lambda_fun, population))
+            weights = list(map(lambda p: p.score / min_score, population))
             parents = random.choices(population, weights=weights, k=2)
 
             # Recombina os genes
-            dna1 = parents[0].dna
-            dna2 = parents[1].dna
-            child = dna1.copy() # Filho inicialmente é a copia do primeiro pai
+            assignment1 = parents[0].assignment
+            assignment2 = parents[1].assignment
+            child = assignment1.copy() # Filho inicialmente é a copia do primeiro pai
 
             for gate, input_ in list(child.keys()):
                 
                 # Nao altera se a informacao for igual em ambos os pais
-                if (dna1[(gate, input_)] == dna2[(gate, input_)]):
+                if (assignment1[(gate, input_)] == assignment2[(gate, input_)]):
                     continue
 
                 # Lista candidatos para uma determinada tupla
                 candidates = list(framework.candidates(aig, child, gate, input_))
 
                 # Verifica se tambem pode puxar o gene do outro parente
-                if (dna2[(gate, input_)] in candidates):
-                    options = (dna1[(gate, input_)], dna2[(gate, input_)])
+                if (assignment2[(gate, input_)] in candidates):
+                    options = (assignment1[(gate, input_)], assignment2[(gate, input_)])
                     child[(gate, input_)] = random.choice(options)
-                '''
-                if (dna1[(gate, input_)] == dna2[(gate, input_)]):
-                    iguais +=1
-                elif (child[(gate, input_)] == dna1[(gate, input_)]):
-                    pai1 += 1
-                elif (child[(gate, input_)] == dna2[(gate, input_)]):
-                    pai2 +=1
-                else:
-                    print('Anomalia!!!')
-                '''
                         
             children.append(Individual(child))
 
@@ -138,12 +123,12 @@ def genetic_algorithm(aig, params):
     def mutate(population, rate):
         mutated = []
         for p in population:
-            i = Individual(p.dna.copy())
+            i = Individual(p.assignment.copy())
             [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
             if should_mutate:
-                gate, input_ = random.choice(list(i.dna.keys()))
-                candidates = list(framework.candidates(aig, i.dna, gate, input_))
-                i.dna[(gate, input_)] = random.choice(candidates)
+                gate, input_ = random.choice(list(i.assignment.keys()))
+                candidates = list(framework.candidates(aig, i.assignment, gate, input_))
+                i.assignment[(gate, input_)] = random.choice(candidates)
             mutated.append(i)
         return mutated
 
