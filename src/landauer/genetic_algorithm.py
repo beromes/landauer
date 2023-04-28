@@ -21,6 +21,7 @@ class ParamMap:
     n_initial_individuals = 50
     reproduction_rate = 1.0
     mutation_rate = 0.2
+    mutation_based = False
 
     def __init__(self, dictt):
         if dictt is dict:          
@@ -49,7 +50,7 @@ def genetic_algorithm(aig, params):
 
     prev_time = time.time()
 
-    # Converte dicionario em classe
+    # Converte dicionario de entrada para uma classe mapeada
     params = ParamMap(params)
 
     # Valida entradas
@@ -106,6 +107,11 @@ def genetic_algorithm(aig, params):
             child = dna1.copy() # Filho inicialmente é a copia do primeiro pai
 
             for gate, input_ in list(child.keys()):
+                
+                # Nao altera se a informacao for igual em ambos os pais
+                if (dna1[(gate, input_)] == dna2[(gate, input_)]):
+                    continue
+
                 # Lista candidatos para uma determinada tupla
                 candidates = list(framework.candidates(aig, child, gate, input_))
 
@@ -130,13 +136,16 @@ def genetic_algorithm(aig, params):
 
     # Aplica mutacao nos individuos de uma populacao
     def mutate(population, rate):
-        for i in population:
+        mutated = []
+        for p in population:
+            i = Individual(p.dna.copy())
             [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
             if should_mutate:
                 gate, input_ = random.choice(list(i.dna.keys()))
                 candidates = list(framework.candidates(aig, i.dna, gate, input_))
                 i.dna[(gate, input_)] = random.choice(candidates)
-        return population
+            mutated.append(i)
+        return mutated
 
     # Seleciona os individuos mais adaptados
     def natural_selection(population):
@@ -163,28 +172,30 @@ def genetic_algorithm(aig, params):
         prev_time = time.time()
 
         # Reprodução
-        new_generation = reproduce(population, params.reproduction_rate, worst.score)
-
-        print('Reproduce = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+        if (params.mutation_based == False):
+            new_generation = reproduce(population, params.reproduction_rate, worst.score)
+            print('Reproduce = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
         # Mutação
+        if (params.mutation_based == True):
+            new_generation = population
         new_generation = mutate(new_generation, params.mutation_rate)
-
         print('Mutation = ' + str(time.time() - prev_time))
         prev_time = time.time()
 
         # Calcula score dos novos indivíduos
         fit(new_generation)
-
         print('Fit = ' + str(time.time() - prev_time))
         prev_time = time.time()
 
-        # population += new_generation
         # Seleciona os mais aptos
+
+        # Estratégia 1
+        # population += new_generation
         # population = natural_selection(population)
 
-        # Teste
+        # Estratégia 2
         population = natural_selection(population)
         new_generation = natural_selection(new_generation)
         population += new_generation

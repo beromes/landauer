@@ -31,38 +31,23 @@ def test_half_adder():
     graph.show(graph.default(result))
 
 
+n_exec = 5
+
+
 def test_designs():
     
     #designs = ['epfl_testa_ctrl.json', 'epfl_testa_int2float.json', 'epfl_testa_dec.json', 'epfl_testa_cavlc.json']
-    designs = ['epfl_testa_ctrl.json']
+    designs = ['epfl_testa_cavlc.json']
 
     param_map = [
         {
             'name': 'Energy - Light',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 10,
-            'n_initial_individuals': 8,
+            'n_generations': 50,
+            'n_initial_individuals': 20,
             'reproduction_rate': 1,
-            'mutation_rate': 0.2
-        },
-        {
-            'name': 'Energy - Medium',
-            'w_energy': 1,
-            'w_delay': 0,
-            'n_generations': 40,
-            'n_initial_individuals': 32,
-            'reproduction_rate': 1,
-            'mutation_rate': 0.2
-        },
-        {
-            'name': 'Energy - Heavy',
-            'w_energy': 1,
-            'w_delay': 0,
-            'n_generations': 100,
-            'n_initial_individuals': 128,
-            'reproduction_rate': 1,
-            'mutation_rate': 0.2
+            'mutation_rate': 0.1
         },
     ]
 
@@ -79,8 +64,8 @@ def test_designs():
 
         for params in param_map:
 
-            for i in range(1, 5):
-                best_assignment = ga.genetic_algorithm(aig, params['w_energy'], params['w_delay'])
+            for i in range(1, n_exec):
+                best_assignment = ga.genetic_algorithm(aig, params).dna
                 forwarding = framework.forwarding(aig, best_assignment)    
                 evaluation = evaluate.evaluate(forwarding, simulation)
 
