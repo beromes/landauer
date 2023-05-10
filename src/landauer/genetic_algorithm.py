@@ -47,6 +47,8 @@ Etapas algoritmo genetico
 '''
 def genetic_algorithm(aig, params):
 
+    debug = True
+
     prev_time = time.time()
 
     # Converte dicionario de entrada para uma classe mapeada
@@ -143,50 +145,45 @@ def genetic_algorithm(aig, params):
 
     # Passo 2 - Aplicar funcao fitness na populacao inicial
     fit(population)
-
-    print('Init population = ' + str(time.time() - prev_time))
-    prev_time = time.time()
+    if (debug):
+        print('Init population = ' + str(time.time() - prev_time))
+        prev_time = time.time()
 
     for i in range(0, params.n_generations):
         # Encontra melhor e pior
         best = max(population, key=attrgetter('score'))
         worst = min(population, key=attrgetter('score'))
         print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
-
-        print('Find best and worst = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+        if (debug):
+            print('Find best and worst = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
         # Reprodução
         if (params.mutation_based == False):
             new_generation = reproduce(population, params.reproduction_rate, worst.score)
-            print('Reproduce = ' + str(time.time() - prev_time))
-            prev_time = time.time()
+            if (debug):
+                print('Reproduce = ' + str(time.time() - prev_time))
+                prev_time = time.time()
 
         # Mutação
         if (params.mutation_based == True):
             new_generation = population
         new_generation = mutate(new_generation, params.mutation_rate)
-        print('Mutation = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+        if (debug):
+            print('Mutation = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
         # Calcula score dos novos indivíduos
         fit(new_generation)
-        print('Fit = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+        if (debug):
+            print('Fit = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
         # Seleciona os mais aptos
-
-        # Estratégia 1
-        # population += new_generation
-        # population = natural_selection(population)
-
-        # Estratégia 2
-        population = natural_selection(population)
-        new_generation = natural_selection(new_generation)
-        population += new_generation
-
-        print('Natural selection = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+        population = natural_selection(population, new_generation)
+        if (debug):
+            print('Natural selection = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
 
     # Encontra melhor e pior
