@@ -28,7 +28,9 @@ def test_half_adder():
         'n_generations': 10,
         'n_initial_individuals': 5,
         'reproduction_rate': 1,
-        'mutation_rate': 0.2
+        'mutation_rate': 0.2,
+        'mutation_based': True,
+        'elitism_rate': 0.1
     }
 
     aig = parse.parse(half_adder)
@@ -62,7 +64,9 @@ def test_designs():
             'n_generations': 500,
             'n_initial_individuals': 20,
             'reproduction_rate': 1,
-            'mutation_rate': 0.2
+            'mutation_rate': 0.2,
+            'mutation_based': True,
+            'elitism_rate': 0.1
         },
         {
             'name': 'Teste Sem Reprodução',
@@ -72,7 +76,8 @@ def test_designs():
             'n_initial_individuals': 20,
             'reproduction_rate': 0,
             'mutation_rate': 1,
-            'mutation_based': True
+            'mutation_based': True,
+            'elitism_rate': 0.1
         },
     ]
 
@@ -101,4 +106,4 @@ def test_designs():
                 print('Energy: ' + str(energy_score))
                 print('Delay: ' + str(delay_score))
 
-test_half_adder()
+test_designs()
