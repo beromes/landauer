@@ -22,6 +22,7 @@ class ParamMap:
     reproduction_rate = 1.0
     mutation_rate = 0.2
     mutation_based = False
+    elitism_rate = 0.1
 
     def __init__(self, dictt):
         if type(dictt) is dict:          
@@ -135,10 +136,14 @@ def genetic_algorithm(aig, params):
         return mutated
 
     # Seleciona os individuos mais adaptados
-    def natural_selection(population):
-        half_index = int(len(population) / 2)
-        list_ = sorted(population, key=lambda p: p.score)
-        return list_[half_index:]
+    def natural_selection(old_generation, new_generation, elitism_rate):
+        n_old_individuals = int(len(old_generation) * elitism_rate)
+        old_generation = sorted(old_generation, key=lambda p: p.score)[n_old_individuals:]
+
+        n_new_individuals = len(new_generation) - n_old_individuals
+        new_generation = sorted(new_generation, key=lambda p: p.score)[n_new_individuals:]
+
+        return old_generation + new_generation
 
     # Passo 1 - Definir a população inicial
     population = init_population(aig, params.n_initial_individuals)
@@ -180,7 +185,7 @@ def genetic_algorithm(aig, params):
             prev_time = time.time()
 
         # Seleciona os mais aptos
-        population = natural_selection(population, new_generation)
+        population = natural_selection(population, new_generation, params.elitism_rate)
         if (debug):
             print('Natural selection = ' + str(time.time() - prev_time))
             prev_time = time.time()
