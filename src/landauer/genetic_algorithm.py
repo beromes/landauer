@@ -48,8 +48,7 @@ Etapas algoritmo genetico
 '''
 def genetic_algorithm(aig, params):
 
-    debug = True
-
+    debug = False
     prev_time = time.time()
 
     # Converte dicionario de entrada para uma classe mapeada
@@ -86,7 +85,8 @@ def genetic_algorithm(aig, params):
         for p in population:
             forwarding_ = framework.forwarding(aig, p.assignment)
             evaluation = evaluate.evaluate(forwarding_, simulation)
-            p.score = 1 - (evaluation['total'] / initial_energy)
+            p.score = evaluation['total']
+            #p.score = 1 - (evaluation['total'] / initial_energy)            
 
     # Faz reprodução dos individuos de uma populacao
     def reproduce(population, rate, min_score):
@@ -137,13 +137,13 @@ def genetic_algorithm(aig, params):
 
     # Seleciona os individuos mais adaptados
     def natural_selection(old_generation, new_generation, elitism_rate):
+        old_generation = sorted(old_generation, key=lambda p: p.score, reverse=True)
+        new_generation = sorted(new_generation, key=lambda p: p.score, reverse=True)
+
         n_old_individuals = int(len(old_generation) * elitism_rate)
-        old_generation = sorted(old_generation, key=lambda p: p.score)[n_old_individuals:]
-
         n_new_individuals = len(new_generation) - n_old_individuals
-        new_generation = sorted(new_generation, key=lambda p: p.score)[n_new_individuals:]
 
-        return old_generation + new_generation
+        return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
 
     # Passo 1 - Definir a população inicial
     population = init_population(aig, params.n_initial_individuals)
@@ -156,8 +156,8 @@ def genetic_algorithm(aig, params):
 
     for i in range(0, params.n_generations):
         # Encontra melhor e pior
-        best = max(population, key=attrgetter('score'))
-        worst = min(population, key=attrgetter('score'))
+        best = min(population, key=attrgetter('score'))
+        worst = max(population, key=attrgetter('score'))
         print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
         if (debug):
             print('Find best and worst = ' + str(time.time() - prev_time))
@@ -192,8 +192,8 @@ def genetic_algorithm(aig, params):
 
 
     # Encontra melhor e pior
-    best = max(population, key=attrgetter('score'))
-    worst = min(population, key=attrgetter('score'))
-    print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
+    best = min(population, key=attrgetter('score'))
+    worst = max(population, key=attrgetter('score'))
+    print("Melhor: " + str(1 - (best.score / initial_energy)) + " - Pior: " + str(1 - (worst.score / initial_energy)))
 
     return best.assignment
