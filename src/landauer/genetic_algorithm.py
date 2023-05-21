@@ -32,6 +32,7 @@ class ParamMap:
 class Individual:
     assignment = None
     score = 0
+    delay = 0
 
     def __init__(self, assignment):
         self.assignment = assignment
@@ -46,7 +47,7 @@ def calc_delay(aig):
 '''
 Etapas algoritmo genetico
 '''
-def genetic_algorithm(aig, params):
+def genetic_algorithm(aig, params, returnAll=False):
 
     debug = False
     prev_time = time.time()
@@ -69,6 +70,9 @@ def genetic_algorithm(aig, params):
     print(initial_energy)
     print(initial_delay)
 
+    # Inicia conjunto com todas as soluções
+    all_individuals = set()
+
     # Retorna populacao inicial
     def init_population(aig, n_individuals):
         assignment = framework.assignment(aig)
@@ -86,6 +90,7 @@ def genetic_algorithm(aig, params):
             forwarding_ = framework.forwarding(aig, p.assignment)
             evaluation = evaluate.evaluate(forwarding_, simulation)
             p.score = evaluation['total']
+            p.delay = calc_delay(forwarding_)
             #p.score = 1 - (evaluation['total'] / initial_energy)            
 
     # Faz reprodução dos individuos de uma populacao
@@ -153,6 +158,8 @@ def genetic_algorithm(aig, params):
     if (debug):
         print('Init population = ' + str(time.time() - prev_time))
         prev_time = time.time()
+    if (returnAll):
+        all_individuals = set(population)
 
     for i in range(0, params.n_generations):
         # Encontra melhor e pior
@@ -184,6 +191,10 @@ def genetic_algorithm(aig, params):
             print('Fit = ' + str(time.time() - prev_time))
             prev_time = time.time()
 
+        # Adiciona soluções
+        if (returnAll):
+            all_individuals = all_individuals.union(set(new_generation))
+
         # Seleciona os mais aptos
         population = natural_selection(population, new_generation, params.elitism_rate)
         if (debug):
@@ -196,4 +207,7 @@ def genetic_algorithm(aig, params):
     worst = max(population, key=attrgetter('score'))
     print("Melhor: " + str(1 - (best.score / initial_energy)) + " - Pior: " + str(1 - (worst.score / initial_energy)))
 
-    return best.assignment
+    if (returnAll):
+        return best, all_individuals
+    else:
+        return best
