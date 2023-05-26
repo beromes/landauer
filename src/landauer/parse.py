@@ -43,20 +43,29 @@ class DefaultVerilogListener(VerilogParserListener):
     @property
     def aig(self):
         # Resolve identifiers
-        for identifier in self._identifiers - self._inputs - self._outputs:
+        for identifier in self._identifiers - self._inputs:
             assignments = list(self._aig.in_edges(identifier, data = 'inverter'))
             assert len(assignments) == 1, f'Expected exactly one assignment to \'{identifier}\', but got {len(assignments)}'
             assignment_in, _, inverted_in = assignments[0]
-            for _, assignment_out, inverted_out in self._aig.out_edges(identifier, data = 'inverter'):
+            for _, assignment_out, inverted_out in list(self._aig.out_edges(identifier, data = 'inverter')):
                 assert not self._aig.has_edge(assignment_in, assignment_out), 'Unexpected gate with duplicated input'
                 self._aig.add_edge(assignment_in, assignment_out, inverter = inverted_in ^ inverted_out)
-            self._aig.remove_node(identifier)
+                self._aig.remove_edge(identifier, assignment_out)
 
+            if identifier not in self._outputs:
+                self._aig.remove_node(identifier)
+
+            self._identifiers.remove(identifier)
+        assert len(self._identifiers - self._inputs) == 0, f'There are identifiers without proper assignment: {", ".join(self._identifiers)}' 
         return self._aig
+
+    # Handle escaped names
+    def _handle_escaped_name(self, identifier):
+        return identifier.lstrip('\\').rstrip()
 
     # Input/Output declaration
     def _get_port_names(self, ctx):
-        return [child.identifier().getText() for child in ctx.list_of_port_identifiers().getChildren() if isinstance(child, VerilogParser.Port_identifierContext)]
+        return [self._handle_escaped_name(child.identifier().getText()) for child in ctx.list_of_port_identifiers().getChildren() if isinstance(child, VerilogParser.Port_identifierContext)]
 
     def exitInput_declaration(self, ctx):
         self._inputs.update(set(self._get_port_names(ctx)))
@@ -99,8 +108,7 @@ class DefaultVerilogListener(VerilogParserListener):
 
             # Identifier
             if (isinstance(ctx.getChild(0), VerilogParser.IdentifierContext)):
-                identifier = ctx.getText()
-                assert identifier not in self._outputs, f'Unexpected reference to output \'{identifier}\''
+                identifier = self._handle_escaped_name(ctx.getText())
                 self._identifiers.add(identifier)
                 return (identifier, False)
 
@@ -131,24 +139,22 @@ class DefaultVerilogListener(VerilogParserListener):
         self._aig.add_edge(expression[0], identifier, inverter = expression[1])
 
     def exitNet_decl_assignment(self, ctx:VerilogParser.Net_decl_assignmentContext):
-        self._assignment(ctx.net_identifier().getText(), ctx.expression())
+        self._assignment(self._handle_escaped_name(ctx.net_identifier().getText()), ctx.expression())
 
     def exitNet_assignment(self, ctx:VerilogParser.Net_assignmentContext):
-        self._assignment(ctx.net_lvalue().getText(), ctx.expression())
+        self._assignment(self._handle_escaped_name(ctx.net_lvalue().getText()), ctx.expression())
 
 class MajoritySupportVerilogListener(DefaultVerilogListener):
     def _parse_identifier(self, ctx):
         if ctx.getChildCount() == 2 and ctx.getChild(0).getText() == '~':
             identifier, is_inverted = self._parse_identifier(ctx.getChild(1))
-            assert identifier not in self._outputs, f'Unexpected reference to output \'{identifier}\''
             self._identifiers.add(identifier)
             return identifier, not is_inverted
 
         if ctx.getChildCount() == 1:
             if not isinstance(ctx.getChild(0), VerilogParser.IdentifierContext):
                 return self._parse_identifier(ctx.getChild(0))
-            identifier = ctx.getText()
-            assert identifier not in self._outputs, f'Unexpected reference to output \'{identifier}\''
+            identifier = self._handle_escaped_name(ctx.getText())
             self._identifiers.add(identifier)
             return (identifier, False)
 

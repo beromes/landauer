@@ -31,7 +31,7 @@ print(aig)
 ```
 > You can enable majority-gates support using the switch `--majority_support`. In this case the output is an AIG superset where a node with three inputs (e.g. a, b, and c) is equivalent to `(a & b) | (a & c) | (b & c)`.
 
-> Verilog subset supported: Single module description. Restricted to `input`, `output`, and `wire` declarations (registers nor arrays are supported). Usage of identifiers before their proper declaration is currently not supported.
+> Verilog subset supported: Single module description. Restricted to `input`, `output`, and `wire` declarations (registers nor arrays are supported).
 
 You can also use this module via the command line. The output is a JSON-serialized NetworkX DiGraph in an adjacency format:
 
@@ -48,13 +48,13 @@ EOF
 # {"directed": true, "multigraph": false, "graph": [], "nodes": [{"id": "a"}, {"id": 1}, {"id": "b"}, {"id": 2}, {"id": 3}, {"id": "sum"}, {"id": 4}, {"id": "cout"}], "adjacency": [[{"inverter": false, "id": 1}, {"inverter": true, "id": 2}, {"inverter": false, "id": 4}], [{"inverter": true, "id": 3}], [{"inverter": true, "id": 1}, {"inverter": false, "id": 2}, {"inverter": false, "id": 4}], [{"inverter": true, "id": 3}], [{"inverter": true, "id": "sum"}], [], [{"inverter": false, "id": "cout"}], []]}
 ```
 
-### Simulate
+### Entropy
 
 Simulates the design for all possible inputs and calculates the entropy for some specific signal sets. We can list the following sets for each gate: inputs, output, and every output-input combination.
 
 ```python
 import landauer.parse as parse
-import landauer.simulate as simulate
+import landauer.entropy as entropy
 
 half_adder = '''
     module half_adder (a, b, sum, cout);
@@ -65,15 +65,15 @@ half_adder = '''
         assign cout = a & b;
     endmodule
 '''
-simulation = simulate.simulate(parse.parse(half_adder))
-print(simulation)
+entropy = entropy.entropy(parse.parse(half_adder))
+print(entropy)
 # {frozenset({'b', 'a'}): 2.0, frozenset({1}): 0.8112781244591328, frozenset({1, 'b'}): 1.5, frozenset({1, 'a'}): 1.5, frozenset({1, 'b', 'a'}): 2.0, frozenset({2}): 0.8112781244591328, frozenset({2, 'b'}): 1.5, frozenset({2, 'a'}): 1.5, frozenset({2, 'b', 'a'}): 2.0, frozenset({4}): 0.8112781244591328, frozenset({'b', 4}): 1.5, frozenset({4, 'a'}): 1.5, frozenset({'b', 4, 'a'}): 2.0, frozenset({1, 2}): 1.5, frozenset({3}): 1.0, frozenset({1, 3}): 1.5, frozenset({2, 3}): 1.5, frozenset({1, 2, 3}): 1.5}
 ```
 > The output is a Python dictionary where the key is the signal set (as a Python `frozenset`), and the value is the entropy (in bits).
 
 You can also use this module via the command line:
 ```bash
-cat << EOF | python -m landauer.parse --stdin | python -m landauer.simulate --stdin
+cat << EOF | python -m landauer.parse --stdin | python -m landauer.entropy --stdin
 module half_adder (a, b, sum, cout);
         input a, b;
         output sum, cout;
