@@ -1,7 +1,6 @@
 import landauer.parse as parse
-import landauer.simulate as simulate
+import landauer.entropy as entropy
 import landauer.evaluate as evaluate
-import landauer.naive as naive
 import landauer.framework as framework
 import landauer.graph as graph
 import networkx as nx
@@ -60,10 +59,10 @@ def genetic_algorithm(aig, params, returnAll=False):
         raise ValueError("A soma dos pesos deve ser igual a 1")
 
     # Simula circuito
-    simulation = simulate.simulate(aig)
+    entropy_s = entropy.entropy(aig)
 
     # Calcula energia e profundidade iniciais
-    initial_energy = evaluate.evaluate(aig, simulation)['total']
+    initial_energy = evaluate.evaluate(aig, entropy_s)['total']
     initial_delay = calc_delay(aig)
 
     print('Energia e Delay inciais')
@@ -88,7 +87,7 @@ def genetic_algorithm(aig, params, returnAll=False):
     def fit(population):
         for p in population:
             forwarding_ = framework.forwarding(aig, p.assignment)
-            evaluation = evaluate.evaluate(forwarding_, simulation)
+            evaluation = evaluate.evaluate(forwarding_, entropy_s)
             p.score = evaluation['total']
             p.delay = calc_delay(forwarding_)
             #p.score = 1 - (evaluation['total'] / initial_energy)            

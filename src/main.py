@@ -1,7 +1,7 @@
 import landauer.parse as parse
-import landauer.simulate as simulate
+import landauer.entropy as entropy
 import landauer.evaluate as evaluate
-import landauer.naive as naive
+import landauer.algorithms.naive as naive
 import landauer.framework as framework
 import landauer.graph as graph
 import landauer.genetic_algorithm as ga
@@ -86,9 +86,9 @@ def test_designs():
     for filename in designs:
         f = open('./designs/' + filename)
         aig = parse.deserialize(f.read())
-        simulation = simulate.simulate(aig)
+        entropy_s = entropy.entropy(aig)
 
-        initial_energy = evaluate.evaluate(aig, simulation)['total']
+        initial_energy = evaluate.evaluate(aig, entropy_s)['total']
         initial_delay = ga.calc_delay(aig)
 
         print(filename)
@@ -97,7 +97,7 @@ def test_designs():
         aig_naive = naive.naive(aig, 'ENERGY_ORIENTED')
         assignment_naive = framework.assignment(aig_naive)
         forwarding_naive = framework.forwarding(aig_naive, assignment_naive)
-        evaluation_naive = evaluate.evaluate(forwarding_naive, simulation)
+        evaluation_naive = evaluate.evaluate(forwarding_naive, entropy_s)
         print('Naive')
         print('Energy: ' + str(evaluation_naive['total']))
         print('Delay: ' + str(ga.calc_delay(aig_naive)))
