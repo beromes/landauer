@@ -44,29 +44,6 @@ Funcoes auxiliares
 def calc_delay(aig):
     return len(nx.dag_longest_path(aig)) - 2
 
-
-# def build_cached_gates(assignment):
-#     if assignment is None:
-#         raise TypeError('assignment não pode ser vazio')
-
-#     cached_gates = {}
-  
-#     for gate, input_ in list(assignment.keys()):
-#         if gate not in cached_gates.keys():
-#             cached_gates[gate] = { 'inputs': set(), 'n_forwardings': 0 }
-
-#         cached_gates[gate]['inputs'].add(input_)
-
-#     for value in list(assignment.values()):
-#         if value in cached_gates.keys():
-#             cached_gates[value]['n_forwardings'] += 1
-
-#     # PROBLEMA: Ciclos
-
-#     return cached_gates
-
-#def candidates(i, gate, input_):
-
 '''
 Etapas algoritmo genetico
 '''
