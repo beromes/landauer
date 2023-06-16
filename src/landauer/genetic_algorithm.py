@@ -30,11 +30,13 @@ class ParamMap:
 
 class Individual:
     assignment = None
+    forwarding = None
     score = 0
     delay = 0
 
-    def __init__(self, assignment):
+    def __init__(self, assignment, forwarding):
         self.assignment = assignment
+        self.forwarding = forwarding
 
 '''
 Funcoes auxiliares
@@ -42,6 +44,28 @@ Funcoes auxiliares
 def calc_delay(aig):
     return len(nx.dag_longest_path(aig)) - 2
 
+
+# def build_cached_gates(assignment):
+#     if assignment is None:
+#         raise TypeError('assignment não pode ser vazio')
+
+#     cached_gates = {}
+  
+#     for gate, input_ in list(assignment.keys()):
+#         if gate not in cached_gates.keys():
+#             cached_gates[gate] = { 'inputs': set(), 'n_forwardings': 0 }
+
+#         cached_gates[gate]['inputs'].add(input_)
+
+#     for value in list(assignment.values()):
+#         if value in cached_gates.keys():
+#             cached_gates[value]['n_forwardings'] += 1
+
+#     # PROBLEMA: Ciclos
+
+#     return cached_gates
+
+#def candidates(i, gate, input_):
 
 '''
 Etapas algoritmo genetico
@@ -78,7 +102,9 @@ def genetic_algorithm(aig, params, returnAll=False):
         population = []
 
         for i in range(0, n_individuals):
-            new_individual = Individual(framework.randomize(aig, assignment))
+            random_assignment = framework.randomize(aig, assignment)
+            random_forwarding = framework.forwarding(aig, random_assignment)
+            new_individual = Individual(random_assignment, random_forwarding)
             population.append(new_individual)
 
         return population
@@ -106,23 +132,32 @@ def genetic_algorithm(aig, params, returnAll=False):
             # Recombina os genes
             assignment1 = parents[0].assignment
             assignment2 = parents[1].assignment
-            child = assignment1.copy() # Filho inicialmente é a copia do primeiro pai
 
-            for gate, input_ in list(child.keys()):
+            child_assignment = assignment1.copy() # Filho inicialmente é a copia do primeiro pai
+            child_forwarding = parents[0].forwarding.copy()
+
+            for gate, input_ in list(child_assignment.keys()):
                 
                 # Nao altera se a informacao for igual em ambos os pais
                 if (assignment1[(gate, input_)] == assignment2[(gate, input_)]):
                     continue
 
                 # Lista candidatos para uma determinada tupla
-                candidates = list(framework.candidates(aig, child, gate, input_))
+                candidates = list(framework.candidates2(aig, child_forwarding, gate, input_))
 
                 # Verifica se tambem pode puxar o gene do outro parente
                 if (assignment2[(gate, input_)] in candidates):
                     options = (assignment1[(gate, input_)], assignment2[(gate, input_)])
-                    child[(gate, input_)] = random.choice(options)
+                    # Verifica se fará uma mudança (ou seja, se pegará a informação do segundo pai)
+                    if (assignment2[(gate, input_)] == random.choice(options)):
+                        # Atualiza assignment
+                        child_assignment[(gate, input_)] = assignment2[(gate, input_)]
+                        # Remove aresta antiga do grafo e adiciona a nova
+                        child_forwarding.remove_edge(assignment1[(gate, input_)], gate)
+                        child_forwarding.add_edge(assignment2[(gate, input_)], gate)
+
                         
-            children.append(Individual(child))
+            children.append(Individual(child_assignment, child_forwarding))
 
         return children
 
@@ -130,12 +165,23 @@ def genetic_algorithm(aig, params, returnAll=False):
     def mutate(population, rate):
         mutated = []
         for p in population:
-            i = Individual(p.assignment.copy())
+            i = Individual(p.assignment.copy(), p.forwarding.copy())
             [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
             if should_mutate:
                 gate, input_ = random.choice(list(i.assignment.keys()))
-                candidates = list(framework.candidates(aig, i.assignment, gate, input_))
-                i.assignment[(gate, input_)] = random.choice(candidates)
+                candidates = list(framework.candidates2(aig, i.forwarding, gate, input_))                
+                
+                # Sorteia um gene para mudar
+                choosed = random.choice(candidates)
+                
+                # Se for diferente, atualiza o indivíduo
+                if (choosed != i.assignment[(gate, input_)]):
+                    # Remove aresta antiga do grafo e adiciona a nova
+                    i.forwarding.remove_edge(i.assignment[(gate, input_)], gate)
+                    i.forwarding.add_edge(choosed, gate)
+                    # Atualiza assignment
+                    i.assignment[(gate, input_)] = choosed
+
             mutated.append(i)
         return mutated
 

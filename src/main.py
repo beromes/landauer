@@ -31,22 +31,21 @@ def test_half_adder():
         'n_initial_individuals': 5,
         'reproduction_rate': 1,
         'mutation_rate': 0.2,
-        'mutation_based': True,
+        'mutation_based': False,
         'elitism_rate': 0.1
     }
 
     aig = parse.parse(half_adder)
     
-    best_assignment = ga.genetic_algorithm(aig, params)
-    print(best_assignment)
+    best = ga.genetic_algorithm(aig, params)
 
-    result = framework.forwarding(aig, best_assignment)
+    result = framework.forwarding(aig, best.assignment)
     framework.colorize(result)
 
     graph.show(graph.default(result))
 
 
-n_exec = 1
+n_exec = 3
 
 def test_designs():
     
@@ -58,28 +57,28 @@ def test_designs():
     ]
 
     param_map = [
+        {
+            'name': 'Teste Com Reprodução',
+            'w_energy': 1,
+            'w_delay': 0,
+            'n_generations': 1000,
+            'n_initial_individuals': 50,
+            'reproduction_rate': 1,
+            'mutation_rate': 0.1,
+            'mutation_based': False,
+            'elitism_rate': 0.1
+        },
         # {
-        #     'name': 'Teste Com Reprodução',
+        #     'name': 'Teste Sem Reprodução',
         #     'w_energy': 1,
         #     'w_delay': 0,
         #     'n_generations': 500,
-        #     'n_initial_individuals': 20,
-        #     'reproduction_rate': 1,
-        #     'mutation_rate': 0.2,
-        #     'mutation_based': False,
+        #     'n_initial_individuals': 50,
+        #     'reproduction_rate': 0,
+        #     'mutation_rate': 1,
+        #     'mutation_based': True,
         #     'elitism_rate': 0.1
         # },
-        {
-            'name': 'Teste Sem Reprodução',
-            'w_energy': 1,
-            'w_delay': 0,
-            'n_generations': 500,
-            'n_initial_individuals': 50,
-            'reproduction_rate': 0,
-            'mutation_rate': 1,
-            'mutation_based': True,
-            'elitism_rate': 0.1
-        },
     ]
 
 
@@ -98,6 +97,7 @@ def test_designs():
         assignment_naive = framework.assignment(aig_naive)
         forwarding_naive = framework.forwarding(aig_naive, assignment_naive)
         evaluation_naive = evaluate.evaluate(forwarding_naive, entropy_s)
+        naive_point = [evaluation_naive['total'], ga.calc_delay(aig_naive)]
         print('Naive')
         print('Energy: ' + str(evaluation_naive['total']))
         print('Delay: ' + str(ga.calc_delay(aig_naive)))
@@ -118,6 +118,6 @@ def test_designs():
 
                 # Pareto
                 x = np.array([[i.score, i.delay] for i in all_solutions])
-                pf.find_pareto_frontier(x, plot=True)
+                pf.find_pareto_frontier(x, naive_point, plot=True)
 
 test_designs()
