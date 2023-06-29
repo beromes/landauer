@@ -4,6 +4,7 @@ import landauer.evaluate as evaluate
 import landauer.framework as framework
 import landauer.graph as graph
 import networkx as nx
+import numpy as np
 import random
 import json
 import time
@@ -103,15 +104,17 @@ def genetic_algorithm(aig, params, returnAll=False):
         for i in range(0, n_children):            
 
             # Escolhe os parentes
-            weights = list(map(lambda p: p.score / min_score, population))
-            parents = random.choices(population, weights=weights, k=2)
+            ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
+            weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
+            weights = weights / np.sum(weights) # divide pela soma para probabilidade somar 1
+            parent1, parent2 = np.random.choice(ordered_population, 2, replace=False, p=weights)
 
             # Recombina os genes
-            assignment1 = parents[0].assignment
-            assignment2 = parents[1].assignment
+            assignment1 = parent1.assignment
+            assignment2 = parent2.assignment
 
             child_assignment = assignment1.copy() # Filho inicialmente é a copia do primeiro pai
-            child_forwarding = parents[0].forwarding.copy()
+            child_forwarding = parent1.forwarding.copy()
 
             for gate, input_ in list(child_assignment.keys()):
                 
