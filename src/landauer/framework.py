@@ -26,6 +26,7 @@ import argparse
 import networkx as nx
 import random
 import seaborn as sns
+import time
 
 from collections import deque
 
@@ -44,6 +45,18 @@ def candidates(aig, assignment, gate, input_):
     outputs = set(p for p in aig.nodes() if len(list(aig.successors(p))) == 0)
     
     return (candidates | {input_}) - full - {gate} - nx.descendants(forwarding_, gate) - outputs
+
+def candidates2(aig, forwarding_, gate, input_):
+    candidates = set(aig.successors(input_))
+    
+    # Majority support: one node cannot forward more than two inputs
+    full = set(c for c in candidates if len(set(key for _, _, key, f in forwarding_.out_edges(c, keys=True, data='forward', default=False) if f) - {input_}) == 2)
+    
+    # Outputs cannot forward information
+    outputs = set(p for p in aig.nodes() if len(list(aig.successors(p))) == 0)
+    
+    return (candidates | {input_}) - full - {gate} - nx.descendants(forwarding_, gate) - outputs
+
 
 def assignment(aig):
     assignment_ = dict()
