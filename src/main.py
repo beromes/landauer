@@ -11,6 +11,18 @@ import numpy as np
 import random
 import json
 
+def get_naive_point(aig, strategy):
+    entropy_s = entropy.entropy(aig)
+    aig_naive = naive.naive(aig, strategy)
+    assignment_naive = framework.assignment(aig_naive)
+    forwarding_naive = framework.forwarding(aig_naive, assignment_naive)
+    evaluation_naive = evaluate.evaluate(forwarding_naive, entropy_s)
+    naive_point = [evaluation_naive['total'], ga.calc_delay(aig_naive)]
+    print('Naive - ' + str(strategy))
+    print('Energy: ' + str(evaluation_naive['total']))
+    print('Delay: ' + str(ga.calc_delay(aig_naive)))
+    return naive_point
+
 def test_half_adder():
 
     half_adder = '''
@@ -45,7 +57,7 @@ def test_half_adder():
     graph.show(graph.default(result))
 
 
-n_exec = 3
+n_exec = 1
 
 def test_designs():
     
@@ -61,8 +73,8 @@ def test_designs():
             'name': 'Teste Com Reprodução',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 1000,
-            'n_initial_individuals': 50,
+            'n_generations': 10,
+            'n_initial_individuals': 10,
             'reproduction_rate': 1,
             'mutation_rate': 0.1,
             'mutation_based': False,
@@ -92,17 +104,10 @@ def test_designs():
 
         print(filename)
 
-        # Naive
-        aig_naive = naive.naive(aig, 'ENERGY_ORIENTED')
-        assignment_naive = framework.assignment(aig_naive)
-        forwarding_naive = framework.forwarding(aig_naive, assignment_naive)
-        evaluation_naive = evaluate.evaluate(forwarding_naive, entropy_s)
-        naive_point = [evaluation_naive['total'], ga.calc_delay(aig_naive)]
-        print('Naive')
-        print('Energy: ' + str(evaluation_naive['total']))
-        print('Delay: ' + str(ga.calc_delay(aig_naive)))
-
-        
+        naive_points = [ 
+            get_naive_point(aig, naive.Strategy.ENERGY_ORIENTED), 
+            get_naive_point(aig, naive.Strategy.DELAY_ORIENTED) 
+        ]
 
         for params in param_map:
 
@@ -118,6 +123,6 @@ def test_designs():
 
                 # Pareto
                 x = np.array([[i.score, i.delay] for i in all_solutions])
-                pf.find_pareto_frontier(x, naive_point, plot=True)
+                pf.find_pareto_frontier(x, naive_points, plot=True)
 
 test_designs()

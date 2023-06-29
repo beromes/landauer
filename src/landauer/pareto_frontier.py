@@ -2,19 +2,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_pareto_frontier(data, membership, member_value, goal):
+def plot_pareto_frontier(data, membership, member_value, goals):
+    goals = np.asarray(goals)
+
     plt.scatter(data[:, 0], data[:, 1])
     plt.scatter(member_value[:, 0], member_value[:, 1], color='r')
-    plt.scatter(goal[0], goal[1], color='purple')
+    plt.scatter(goals[:, 0], goals[:, 1], color='purple')
     plt.legend(['Data', 'Fronteira de Pareto'])
     plt.xlabel('Perda de Entropia')
     plt.ylabel('Delay')
     plt.show()
 
-def find_pareto_frontier(input, goal, plot=False):
+def find_pareto_frontier(input, goals, plot=False):
     out = []
-    
-    data = np.unique(input, axis=0)
+    data = np.concatenate((input, goals), axis=0)
+    data = np.unique(data, axis=0)
     for i in range(data.shape[0]):
         c_data = np.tile(data[i, :], (data.shape[0], 1))
         t_data = data.copy()
@@ -30,6 +32,6 @@ def find_pareto_frontier(input, goal, plot=False):
     member_value = np.array(out)
 
     if(plot):
-        plot_pareto_frontier(input, membership, member_value, goal)
+        plot_pareto_frontier(input, membership, member_value, goals)
     
     return membership, member_value
