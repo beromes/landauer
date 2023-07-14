@@ -74,6 +74,13 @@ def genetic_algorithm(aig, params, returnAll=False):
     # Inicia conjunto com todas as soluções
     all_individuals = set()
 
+    # Inicia retorno com resultados ao longo do tempo
+    evolution_results = {
+        'global_best': [],
+        'generation_best': [],
+        'generation_worst': []
+    }
+
     # Retorna populacao inicial
     def init_population(aig, n_individuals):
         assignment = framework.assignment(aig)
@@ -190,6 +197,11 @@ def genetic_algorithm(aig, params, returnAll=False):
         # Encontra melhor e pior
         best = min(population, key=attrgetter('score'))
         worst = max(population, key=attrgetter('score'))
+        evolution_results['global_best'].append(best.score)
+        if (i == 0):
+            evolution_results['generation_best'].append(best.score)
+            evolution_results['generation_worst'].append(worst.score)
+
         print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
         if (debug):
             print('Find best and worst = ' + str(time.time() - prev_time))
@@ -220,6 +232,10 @@ def genetic_algorithm(aig, params, returnAll=False):
         if (returnAll):
             all_individuals = all_individuals.union(set(new_generation))
 
+        # Salva os resultados da geração
+        evolution_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
+        evolution_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
+
         # Seleciona os mais aptos
         population = natural_selection(population, new_generation, params.elitism_rate)
         if (debug):
@@ -231,8 +247,9 @@ def genetic_algorithm(aig, params, returnAll=False):
     best = min(population, key=attrgetter('score'))
     worst = max(population, key=attrgetter('score'))
     print("Melhor: " + str(1 - (best.score / initial_energy)) + " - Pior: " + str(1 - (worst.score / initial_energy)))
+    evolution_results['global_best'].append(best.score)
 
     if (returnAll):
-        return best, all_individuals
+        return best, evolution_results, all_individuals
     else:
-        return best
+        return best, evolution_results

@@ -8,7 +8,7 @@ def plot_pareto_frontier(data, membership, member_value, goals):
     plt.scatter(data[:, 0], data[:, 1])
     plt.scatter(member_value[:, 0], member_value[:, 1], color='r')
     plt.scatter(goals[:, 0], goals[:, 1], color='purple')
-    plt.legend(['Data', 'Fronteira de Pareto'])
+    plt.legend(['Data', 'Fronteira de Pareto', 'Naive'])
     plt.xlabel('Perda de Entropia')
     plt.ylabel('Delay')
     plt.show()
@@ -35,3 +35,19 @@ def find_pareto_frontier(input, goals, plot=False):
         plot_pareto_frontier(input, membership, member_value, goals)
     
     return membership, member_value
+
+
+def evolution_over_generations(results):
+    global_best = np.asarray(results['global_best'])
+    generation_best = np.asarray(results['generation_best'])
+    generation_worst = np.asarray(results['generation_worst'])
+
+    x_values = range(1, len(global_best) + 1)
+
+    plt.plot(x_values, global_best, color='blue')
+    plt.plot(x_values, generation_best, color='green')
+    plt.plot(x_values, generation_worst, color='red')
+    plt.legend(['Melhor Global', 'Melhor da Geração', 'Pior da geração'])
+    plt.xlabel('N° Geração')
+    plt.ylabel('Score (Perda de Informação)')
+    plt.show()

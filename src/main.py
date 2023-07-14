@@ -73,10 +73,10 @@ def test_designs():
             'name': 'Teste Com Reprodução',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 10,
-            'n_initial_individuals': 10,
+            'n_generations': 100,
+            'n_initial_individuals': 30,
             'reproduction_rate': 1,
-            'mutation_rate': 0.1,
+            'mutation_rate': 0.9,
             'mutation_based': False,
             'elitism_rate': 0.1
         },
@@ -112,7 +112,7 @@ def test_designs():
         for params in param_map:
 
             for i in range(0, n_exec):
-                best, all_solutions = ga.genetic_algorithm(aig, params, returnAll=True)
+                best, evolution_results, all_solutions = ga.genetic_algorithm(aig, params, returnAll=True)
 
                 energy_score = 1 - (best.score / initial_energy)
                 delay_score = 1 - (best.delay / initial_delay)
@@ -124,5 +124,6 @@ def test_designs():
                 # Pareto
                 x = np.array([[i.score, i.delay] for i in all_solutions])
                 pf.find_pareto_frontier(x, naive_points, plot=True)
+                pf.evolution_over_generations(evolution_results)
 
 test_designs()
