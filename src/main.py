@@ -50,7 +50,7 @@ def test_half_adder():
         'n_initial_individuals': 5,
         'reproduction_rate': 1,
         'mutation_rate': 0.2,
-        'mutation_based': False,
+        'mutation_intensity': 0.8, 
         'elitism_rate': 0.1
     }
 
@@ -69,8 +69,8 @@ n_exec = 1
 def test_designs():
     
     designs = [
-        'demo.json'
-        # 'epfl_testa_ctrl.json',
+        #'demo.json'
+        'epfl_testa_ctrl.json',
         # 'epfl_testa_int2float.json',
         # 'epfl_testa_dec.json',
         # 'epfl_testa_cavlc.json'
@@ -81,8 +81,8 @@ def test_designs():
             'name': 'Teste Com Reprodução',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 100,
-            'n_initial_individuals': 10,
+            'n_generations': 1000,
+            'n_initial_individuals': 30,
             'reproduction_rate': 1,
             'mutation_rate': 0.2,
             'mutation_based': False,
@@ -109,7 +109,7 @@ def test_designs():
         for params in param_map:
 
             for i in range(0, n_exec):
-                best, evolution_results, all_solutions = ga.genetic_algorithm(aig, params, returnAll=True)
+                best, evolution_results, all_solutions = ga.genetic_algorithm(aig, params)
                 best = find_best(all_solutions)
 
                 energy_score = 1 - (best.score / initial_energy)

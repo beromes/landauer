@@ -21,6 +21,7 @@ class ParamMap:
     n_initial_individuals = 50
     reproduction_rate = 1.0
     mutation_rate = 0.2
+    mutation_intensity = 0.8
     elitism_rate = 0.1
 
     def __init__(self, dictt):
@@ -148,16 +149,29 @@ def genetic_algorithm(aig, params):
         return children
 
     # Aplica mutacao nos individuos de uma populacao
-    def mutate(population, rate):
-        mutated = []
+    def mutate(population, rate, intensity):
+        mutated_pop = []
         for p in population:
+
+            # Copia indivíduo
             i = Individual(p.assignment.copy(), p.forwarding.copy())
+
+            # Sorteia se ele deve sofrer mutação
             [ should_mutate ] = random.choices((True, False), weights=(rate, 1 - rate), k=1)
-            if should_mutate:
-                gate, input_ = random.choice(list(i.assignment.keys()))
-                candidates = list(framework.candidates2(aig, i.forwarding, gate, input_))                
-                
-                # Sorteia um gene para mudar
+
+            # Se não precisa sofrer mutação, adiciona indivíduo sem nenhuma alteração
+            if should_mutate == False:
+                mutated_pop.append(i)
+                continue
+
+            # Seleciona genes que devem mudar
+            num_changing_genes = int(len(i.assignment.keys()) * intensity)
+            changing_genes = random.choices(list(i.assignment.keys()), k=num_changing_genes)
+
+            for (gate, input_) in changing_genes:
+
+                # Lista os candidatos e escolhe um aleatório
+                candidates = list(framework.candidates2(aig, i.forwarding, gate, input_))
                 choosed = random.choice(candidates)
                 
                 # Se for diferente, atualiza o indivíduo
@@ -168,8 +182,8 @@ def genetic_algorithm(aig, params):
                     # Atualiza assignment
                     i.assignment[(gate, input_)] = choosed
 
-            mutated.append(i)
-        return mutated
+            mutated_pop.append(i)
+        return mutated_pop
 
     # Seleciona os individuos mais adaptados
     def natural_selection(old_generation, new_generation, elitism_rate):
@@ -214,7 +228,7 @@ def genetic_algorithm(aig, params):
             prev_time = time.time()
 
         # Mutação
-        new_generation = mutate(new_generation, params.mutation_rate)
+        new_generation = mutate(new_generation, params.mutation_rate, params.mutation_intensity)
         if (debug):
             print('Mutation = ' + str(time.time() - prev_time))
             prev_time = time.time()
