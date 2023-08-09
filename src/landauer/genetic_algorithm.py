@@ -21,7 +21,6 @@ class ParamMap:
     n_initial_individuals = 50
     reproduction_rate = 1.0
     mutation_rate = 0.2
-    mutation_based = False
     elitism_rate = 0.1
 
     def __init__(self, dictt):
@@ -48,7 +47,7 @@ def calc_delay(aig):
 '''
 Etapas algoritmo genetico
 '''
-def genetic_algorithm(aig, params, returnAll=False):
+def genetic_algorithm(aig, params):
 
     debug = False
     prev_time = time.time()
@@ -190,8 +189,9 @@ def genetic_algorithm(aig, params, returnAll=False):
     if (debug):
         print('Init population = ' + str(time.time() - prev_time))
         prev_time = time.time()
-    if (returnAll):
-        all_individuals = set(population)
+    
+    # Inicia conjunto com todas as soluções
+    all_individuals = set(population)
 
     for i in range(0, params.n_generations):
         # Encontra melhor e pior
@@ -208,15 +208,12 @@ def genetic_algorithm(aig, params, returnAll=False):
             prev_time = time.time()
 
         # Reprodução
-        if (params.mutation_based == False):
-            new_generation = reproduce(population, params.reproduction_rate, worst.score)
-            if (debug):
-                print('Reproduce = ' + str(time.time() - prev_time))
-                prev_time = time.time()
+        new_generation = reproduce(population, params.reproduction_rate, worst.score)
+        if (debug):
+            print('Reproduce = ' + str(time.time() - prev_time))
+            prev_time = time.time()
 
         # Mutação
-        if (params.mutation_based == True):
-            new_generation = population
         new_generation = mutate(new_generation, params.mutation_rate)
         if (debug):
             print('Mutation = ' + str(time.time() - prev_time))
@@ -229,8 +226,7 @@ def genetic_algorithm(aig, params, returnAll=False):
             prev_time = time.time()
 
         # Adiciona soluções
-        if (returnAll):
-            all_individuals = all_individuals.union(set(new_generation))
+        all_individsuals = all_individuals.union(set(new_generation))
 
         # Salva os resultados da geração
         evolution_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
@@ -249,7 +245,4 @@ def genetic_algorithm(aig, params, returnAll=False):
     print("Melhor: " + str(1 - (best.score / initial_energy)) + " - Pior: " + str(1 - (worst.score / initial_energy)))
     evolution_results['global_best'].append(best.score)
 
-    if (returnAll):
-        return best, evolution_results, all_individuals
-    else:
-        return best, evolution_results
+    return best, evolution_results, all_individuals
