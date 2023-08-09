@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 import random
 import json
+from operator import attrgetter
 
 def get_naive_point(aig, strategy):
     entropy_s = entropy.entropy(aig)
@@ -22,6 +23,12 @@ def get_naive_point(aig, strategy):
     print('Energy: ' + str(evaluation_naive['total']))
     print('Delay: ' + str(ga.calc_delay(aig_naive)))
     return naive_point
+
+
+def find_best(individuals): 
+    best_score = min(individuals, key=attrgetter('score')).score
+    best = min(filter(lambda x: x.score == best_score, individuals), key=attrgetter('delay'))
+    return best
 
 def test_half_adder():
 
@@ -62,7 +69,8 @@ n_exec = 1
 def test_designs():
     
     designs = [
-        'epfl_testa_ctrl.json',
+        'demo.json'
+        # 'epfl_testa_ctrl.json',
         # 'epfl_testa_int2float.json',
         # 'epfl_testa_dec.json',
         # 'epfl_testa_cavlc.json'
@@ -74,23 +82,12 @@ def test_designs():
             'w_energy': 1,
             'w_delay': 0,
             'n_generations': 100,
-            'n_initial_individuals': 30,
+            'n_initial_individuals': 10,
             'reproduction_rate': 1,
-            'mutation_rate': 0.9,
+            'mutation_rate': 0.2,
             'mutation_based': False,
             'elitism_rate': 0.1
-        },
-        # {
-        #     'name': 'Teste Sem Reprodução',
-        #     'w_energy': 1,
-        #     'w_delay': 0,
-        #     'n_generations': 500,
-        #     'n_initial_individuals': 50,
-        #     'reproduction_rate': 0,
-        #     'mutation_rate': 1,
-        #     'mutation_based': True,
-        #     'elitism_rate': 0.1
-        # },
+        }
     ]
 
 
@@ -113,11 +110,12 @@ def test_designs():
 
             for i in range(0, n_exec):
                 best, evolution_results, all_solutions = ga.genetic_algorithm(aig, params, returnAll=True)
+                best = find_best(all_solutions)
 
                 energy_score = 1 - (best.score / initial_energy)
                 delay_score = 1 - (best.delay / initial_delay)
 
-                print(params['name'] + ' - Execution ' + str(i))
+                print(params['name'] + ' - Execução ' + str(i))
                 print('Energy: ' + str(best.score) + '(' + str(energy_score) + '%)')
                 print('Delay: ' + str(best.delay) + '(' + str(delay_score) + '%)')
 
@@ -125,5 +123,10 @@ def test_designs():
                 x = np.array([[i.score, i.delay] for i in all_solutions])
                 pf.find_pareto_frontier(x, naive_points, plot=True)
                 pf.evolution_over_generations(evolution_results)
+
+                # Desenho
+                result = framework.forwarding(aig, best.assignment)
+                framework.colorize(result)
+                graph.show(graph.default(result))
 
 test_designs()
