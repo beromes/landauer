@@ -104,7 +104,7 @@ def genetic_algorithm(aig, params):
             #p.score = 1 - (evaluation['total'] / initial_energy)            
 
     # Faz reprodução dos individuos de uma populacao
-    def reproduce(population, rate, min_score):
+    def reproduce(population, rate):
         n_children = int(len(population) * rate)
         children = []
 
@@ -222,7 +222,7 @@ def genetic_algorithm(aig, params):
             prev_time = time.time()
 
         # Reprodução
-        new_generation = reproduce(population, params.reproduction_rate, worst.score)
+        new_generation = reproduce(population, params.reproduction_rate)
         if (debug):
             print('Reproduce = ' + str(time.time() - prev_time))
             prev_time = time.time()
