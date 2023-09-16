@@ -11,6 +11,7 @@ import numpy as np
 import random
 import json
 from operator import attrgetter
+from enum import Enum, auto
 
 half_adder = '''
     module half_adder (a, b, sum, cout);
@@ -40,7 +41,13 @@ def find_best(individuals):
     best = min(filter(lambda x: x.score == best_score, individuals), key=attrgetter('delay'))
     return best
 
-def new_reproduction():
+
+class CrossoverStrategy(Enum):
+    LEVEL = auto()
+    GATE = auto()
+    INPUT = auto()
+
+def new_reproduction(strategy = CrossoverStrategy.INPUT):
 
     aig = parse.parse(half_adder)
     assignment = framework.assignment(aig)
@@ -61,10 +68,40 @@ def new_reproduction():
         framework.colorize(forwarding_)
         graph.show(graph.default(forwarding_))
 
-    def split_assignment(assignment_):
-        size = len(assignment_) // 2
-        items = list(assignment_.items())
-        return [dict(items[size:]), dict(items[:size])]
+    def split_assignment(i, strategy: CrossoverStrategy):
+
+        if strategy == CrossoverStrategy.INPUT:
+            keys = list(i['assignment'].keys())
+            inputs = sorted(set(map(lambda k: k[1], keys)))
+
+            leading_inputs = inputs[:len(inputs) // 2]
+            trailling_inputs = inputs[len(inputs) // 2:]
+        
+            return [
+                {k: v for k, v in i['assignment'].items() if k[1] in leading_inputs},
+                {k: v for k, v in i['assignment'].items() if k[1] in trailling_inputs}
+            ]
+
+        elif strategy == CrossoverStrategy.GATE:
+            keys = list(i['assignment'].keys())
+            gates = sorted(set(map(lambda k: k[0], keys)))
+
+            leading_gates = gates[:len(gates) // 2]
+            trailling_gates = gates[len(gates) // 2:]
+
+            return [
+                {k: v for k, v in i['assignment'].items() if k[0] in leading_gates},
+                {k: v for k, v in i['assignment'].items() if k[0] in trailling_gates}
+            ]
+
+        elif strategy == CrossoverStrategy.LEVEL:
+            depth = len(nx.dag_longest_path(aig)) - 2
+
+        else:
+            raise ValueError("Invalid crossover strategy")
+
+
+
 
     def is_valid(forwarding, gate, value):
         return value not in nx.descendants(forwarding, gate)
@@ -97,8 +134,8 @@ def new_reproduction():
     print(i1['assignment'])
     print(i2['assignment'])
 
-    i1 = split_assignment(i1['assignment'])
-    i2 = split_assignment(i2['assignment'])
+    i1 = split_assignment(i1, strategy)
+    i2 = split_assignment(i2, strategy)
 
     child1, child2 = i1[0], i2[0]
     child1.update(i2[1])
@@ -124,8 +161,8 @@ n_exec = 1
 def test_designs():
     
     designs = [
-        #'demo.json'
-        'epfl_testa_ctrl.json',
+        'demo.json'
+        # 'epfl_testa_ctrl.json',
         # 'epfl_testa_int2float.json',
         # 'epfl_testa_dec.json',
         # 'epfl_testa_cavlc.json'
@@ -136,8 +173,8 @@ def test_designs():
             'name': 'Teste Com Reprodução',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 100,
-            'n_initial_individuals': 30,
+            'n_generations': 10,
+            'n_initial_individuals': 10,
             'reproduction_rate': 1,
             'mutation_rate': 0.1,
             'mutation_intensity': 0.1,
@@ -184,4 +221,5 @@ def test_designs():
                 framework.colorize(result)
                 graph.show(graph.default(result))
 
+#test_designs()
 new_reproduction()
