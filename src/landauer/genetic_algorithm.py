@@ -2,13 +2,17 @@ import landauer.parse as parse
 import landauer.entropy as entropy
 import landauer.evaluate as evaluate
 import landauer.framework as framework
+import landauer.algorithms.naive as naive
 import landauer.graph as graph
+import landauer.pareto_frontier as pf
 import networkx as nx
 import numpy as np
 import random
 import json
 import time
 from operator import attrgetter
+from enum import Enum, auto
+import pprint
 
 '''
 Classes/Modelos
@@ -39,18 +43,36 @@ class Individual:
         self.assignment = assignment
         self.forwarding = forwarding
 
+class CrossoverStrategy(Enum):
+    LEVEL = auto()
+    GATE = auto()
+    INPUT = auto()
+
 '''
 Funcoes auxiliares
 '''
 def calc_delay(aig):
     return len(nx.dag_longest_path(aig)) - 2
 
+def get_naive_point(aig, strategy):
+    entropy_s = entropy.entropy(aig)
+    aig_naive = naive.naive(aig, strategy)
+    assignment_naive = framework.assignment(aig_naive)
+    forwarding_naive = framework.forwarding(aig_naive, assignment_naive)
+    evaluation_naive = evaluate.evaluate(forwarding_naive, entropy_s)
+    naive_point = [evaluation_naive['total'], calc_delay(aig_naive)]
+    print('Naive - ' + str(strategy))
+    print('Energy: ' + str(evaluation_naive['total']))
+    print('Delay: ' + str(calc_delay(aig_naive)))
+    return naive_point
+
 '''
 Etapas algoritmo genetico
 '''
-def genetic_algorithm(aig, params):
+def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=False):
 
-    debug = False
+    # Variável utilizada para calcular tempo gasto em cada etapa
+    global prev_time
     prev_time = time.time()
 
     # Converte dicionario de entrada para uma classe mapeada
@@ -75,7 +97,7 @@ def genetic_algorithm(aig, params):
     all_individuals = set()
 
     # Inicia retorno com resultados ao longo do tempo
-    evolution_results = {
+    evolutionary_results = {
         'global_best': [],
         'generation_best': [],
         'generation_worst': []
@@ -86,7 +108,7 @@ def genetic_algorithm(aig, params):
         assignment = framework.assignment(aig)
         population = []
 
-        for i in range(0, n_individuals):
+        for i in range(n_individuals):
             random_assignment = framework.randomize(aig, assignment)
             random_forwarding = framework.forwarding(aig, random_assignment)
             new_individual = Individual(random_assignment, random_forwarding)
@@ -94,57 +116,137 @@ def genetic_algorithm(aig, params):
 
         return population
 
-    # Funcao fitness que tenta minimizar a entropia
+    # Calcula o score baseado na perda de entropia, também calcula o delay
     def fit(population):
-        for p in population:
-            forwarding_ = framework.forwarding(aig, p.assignment)
-            evaluation = evaluate.evaluate(forwarding_, entropy_s)
+        for p in population:            
+            evaluation = evaluate.evaluate(p.forwarding, entropy_s)
             p.score = evaluation['total']
-            p.delay = calc_delay(forwarding_)
-            #p.score = 1 - (evaluation['total'] / initial_energy)            
+            p.delay = calc_delay(p.forwarding)
 
     # Faz reprodução dos individuos de uma populacao
-    def reproduce(population, rate):
+    def reproduce(population, rate, strategy = CrossoverStrategy.INPUT):
+
+        def split_assignment(i: Individual, strategy: CrossoverStrategy):
+            if strategy == CrossoverStrategy.INPUT:
+                keys = list(i.assignment.keys())
+                inputs = list(set(map(lambda k: str(k[1]), keys)))
+
+                leading_inputs = inputs[:len(inputs) // 2]
+                trailing_inputs = inputs[len(inputs) // 2:]
+
+                return [
+                    {k: v for k, v in i.assignment.items() if str(k[1]) in leading_inputs},
+                    {k: v for k, v in i.assignment.items() if str(k[1]) in trailing_inputs}
+                ]
+
+            elif strategy == CrossoverStrategy.GATE:
+                keys = map(lambda k: k[0], i.assignment.keys())
+                gates = sorted(set(filter(lambda k: type(k) == int, keys)))
+                leading_gates = gates[:len(gates) // 2]
+
+                return [
+                    {k: v for k, v in i.assignment.items() if k[0] in leading_gates},
+                    {k: v for k, v in i.assignment.items() if k[0] not in leading_gates}
+                ]
+
+            # TODO: implementar divisão por níveis
+            else:
+                raise ValueError("Invalid crossover strategy")
+
+        def is_valid(forwarding, gate, value):
+            return value not in nx.descendants(forwarding, gate)
+            
+        def make_child(p1, p2):
+
+            # Inicialmente, o filho é uma cópia do primeiro pai
+            assignment = p1.assignment.copy()
+            forwarding = framework.forwarding(aig, assignment)
+            child = Individual(assignment, forwarding)
+
+            #  Mesca com os genes do segundo pai
+            for k, v in p2.items():
+
+                # Checa se o valor é igual em ambos os parentes
+                if (child.assignment[k] == v):
+                    continue
+
+                # Checa se pode receber a informação do segundo parente
+                if is_valid(child.forwarding, k[0], v) == False:
+                    continue
+
+                child.forwarding.remove_edge(child.assignment[k], k[0])
+                child.forwarding.add_edge(v, k[0])
+                child.assignment[k] = v
+
+            child.forwarding = framework.forwarding(aig, child.assignment) # TODO: Entender porque essa linha é necessária!
+            return child
+
+        # Código Antigo - corrige o invidíduo após juntar partes arbritariamente
+        # def make_individual(assignment):
+        #     forwarding = framework.forwarding(aig, assignment)
+
+        #     for (key, value) in assignment.items():
+
+        #         if is_valid(forwarding, key[0], value):
+        #             continue
+
+        #         print('Inválido!', key, value)
+        #         candidates = list(framework.candidates(aig, assignment, key[0], key[1]))
+        #         print('Candidatos:', candidates)
+
+        #         if (len(candidates) == 0):
+        #             print(list(filter(lambda i: i[0][0] == key[1], assignment.items())))
+        #             pprint.pprint(assignment)
+        #             framework.colorize(forwarding)
+        #             graph.show(graph.default(forwarding))
+
+        #         new_value = random.choice(candidates)
+
+        #         assignment[key] = new_value
+        #         forwarding.remove_edge(value, key[0])
+        #         forwarding.add_edge(new_value, key[0])
+
+        #     return Individual(assignment, forwarding)
+
+
         n_children = int(len(population) * rate)
         children = []
 
-        for i in range(0, n_children):            
+        for i in range(n_children // 2):
 
             # Escolhe os parentes
             ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
             weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
-            weights = weights / np.sum(weights) # divide pela soma para probabilidade somar 1
-            parent1, parent2 = np.random.choice(ordered_population, 2, replace=False, p=weights)
+            weights = weights / np.sum(weights) # divide pela soma dos pesos para que a soma total seja 1
+            p1, p2 = np.random.choice(ordered_population, 2, replace=False, p=weights) # Escolhe dois parentes sem reposição
 
-            # Recombina os genes
-            assignment1 = parent1.assignment
-            assignment2 = parent2.assignment
+            # Separa os genes de acordo com a estratégia
+            splitted_p1 = split_assignment(p1, strategy)
+            splitted_p2 = split_assignment(p2, strategy)
 
-            child_assignment = assignment1.copy() # Filho inicialmente é a copia do primeiro pai
-            child_forwarding = parent1.forwarding.copy()
+            # Cria filhos a partir da combinação dos genes dos pais
+            child1 = make_child(p1, splitted_p2[1])
+            child2 = make_child(p2, splitted_p1[1])
 
-            for gate, input_ in list(child_assignment.keys()):
-                
-                # Nao altera se a informacao for igual em ambos os pais
-                if (assignment1[(gate, input_)] == assignment2[(gate, input_)]):
-                    continue
+            # Código antigo: corrige falhas depois
+            # child1, child2 = p1.assignment.copy(), p2.assignment.copy()
+            # child1.update(splitted_p2[1])
+            # child2.update(splitted_p1[1])
 
-                # Lista candidatos para uma determinada tupla
-                candidates = list(framework.candidates2(aig, child_forwarding, gate, input_))
+            for key in p1.assignment.keys():
+                if key not in child1.assignment.keys():
+                    print('ERRO: Está em p1 mas não em child1', key)
 
-                # Verifica se tambem pode puxar o gene do outro parente
-                if (assignment2[(gate, input_)] in candidates):
-                    options = (assignment1[(gate, input_)], assignment2[(gate, input_)])
-                    # Verifica se fará uma mudança (ou seja, se pegará a informação do segundo pai)
-                    if (assignment2[(gate, input_)] == random.choice(options)):
-                        # Atualiza assignment
-                        child_assignment[(gate, input_)] = assignment2[(gate, input_)]
-                        # Remove aresta antiga do grafo e adiciona a nova
-                        child_forwarding.remove_edge(assignment1[(gate, input_)], gate)
-                        child_forwarding.add_edge(assignment2[(gate, input_)], gate)
+            for key in child1.assignment.keys():
+                if key not in p1.assignment.keys():
+                    print('ERRO: Está em child1 mas não em p1', key)
 
-                        
-            children.append(Individual(child_assignment, child_forwarding))
+            for i in range(len(p1.assignment.keys())):
+                if list(p1.assignment.keys())[i] != list(child1.assignment.keys())[i]:
+                    print('ERRO: Não estão na mesma ordem!', i)
+
+            children.append(child1)
+            children.append(child2)
 
         return children
 
@@ -152,7 +254,6 @@ def genetic_algorithm(aig, params):
     def mutate(population, rate, intensity):
         mutated_pop = []
         for p in population:
-
             # Copia indivíduo
             i = Individual(p.assignment.copy(), p.forwarding.copy())
 
@@ -169,9 +270,8 @@ def genetic_algorithm(aig, params):
             changing_genes = random.choices(list(i.assignment.keys()), k=num_changing_genes)
 
             for (gate, input_) in changing_genes:
-
-                # Lista os candidatos e escolhe um aleatório
-                candidates = list(framework.candidates2(aig, i.forwarding, gate, input_))
+                # Lista os candidatos e escolhe um aleatório                
+                candidates = list(framework.candidates2(aig, i.forwarding, gate, input_)) # TODO: substituir candidates2 por uma alternativa mais eficiente
                 choosed = random.choice(candidates)
                 
                 # Se for diferente, atualiza o indivíduo
@@ -195,68 +295,85 @@ def genetic_algorithm(aig, params):
 
         return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
 
+    def log(message):
+        if debug == False: return
+
+        global prev_time
+        print('[TIME] ' + message + ' = ' + str(time.time() - prev_time))
+        prev_time = time.time()
+
+
     # Passo 1 - Definir a população inicial
     population = init_population(aig, params.n_initial_individuals)
+    log('Definir população inicial')
 
     # Passo 2 - Aplicar funcao fitness na populacao inicial
     fit(population)
-    if (debug):
-        print('Init population = ' + str(time.time() - prev_time))
-        prev_time = time.time()
+    log('Avaliar a população inicial')
     
     # Inicia conjunto com todas as soluções
     all_individuals = set(population)
 
-    for i in range(0, params.n_generations):
+    for i in range(params.n_generations):
         # Encontra melhor e pior
         best = min(population, key=attrgetter('score'))
         worst = max(population, key=attrgetter('score'))
-        evolution_results['global_best'].append(best.score)
+        evolutionary_results['global_best'].append(best.score)
         if (i == 0):
-            evolution_results['generation_best'].append(best.score)
-            evolution_results['generation_worst'].append(worst.score)
+            evolutionary_results['generation_best'].append(best.score)
+            evolutionary_results['generation_worst'].append(worst.score)
 
         print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
-        if (debug):
-            print('Find best and worst = ' + str(time.time() - prev_time))
-            prev_time = time.time()
 
-        # Reprodução
+        # Passo 3 - Reprodução
         new_generation = reproduce(population, params.reproduction_rate)
-        if (debug):
-            print('Reproduce = ' + str(time.time() - prev_time))
-            prev_time = time.time()
+        log('Reprodução')
 
-        # Mutação
+        # Passo 4 - Mutação
         new_generation = mutate(new_generation, params.mutation_rate, params.mutation_intensity)
-        if (debug):
-            print('Mutation = ' + str(time.time() - prev_time))
-            prev_time = time.time()
+        log('Mutação')
 
-        # Calcula score dos novos indivíduos
+        # Passo 5 - Fitness
         fit(new_generation)
-        if (debug):
-            print('Fit = ' + str(time.time() - prev_time))
-            prev_time = time.time()
+        log('Fitness')
 
-        # Adiciona soluções
-        all_individsuals = all_individuals.union(set(new_generation))
+        # Passo 6 - Seleção natural
+        population = natural_selection(population, new_generation, params.elitism_rate)
+        log('Seleção natural')
+
+        # Adiciona novas soluções
+        all_individuals = all_individuals.union(set(new_generation))
 
         # Salva os resultados da geração
-        evolution_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
-        evolution_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
-
-        # Seleciona os mais aptos
-        population = natural_selection(population, new_generation, params.elitism_rate)
-        if (debug):
-            print('Natural selection = ' + str(time.time() - prev_time))
-            prev_time = time.time()
+        evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
+        evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
 
 
-    # Encontra melhor e pior
+    # Encontra melhor solução geral
     best = min(population, key=attrgetter('score'))
-    worst = max(population, key=attrgetter('score'))
-    print("Melhor: " + str(1 - (best.score / initial_energy)) + " - Pior: " + str(1 - (worst.score / initial_energy)))
-    evolution_results['global_best'].append(best.score)
+    evolutionary_results['global_best'].append(best.score)
 
-    return best, evolution_results, all_individuals
+    print("==== Melhor Solução ====")
+    energy_score = 1 - (best.score / initial_energy)
+    delay_score = 1 - (best.delay / initial_delay)
+    print('Energia: ' + str(best.score) + '(' + str(energy_score) + '%)')
+    print('Delay: ' + str(best.delay) + '(' + str(delay_score) + '%)')
+
+    # Plota resultados
+    if plot_results:
+        points = np.array([[i.score, i.delay] for i in all_individuals])
+        naive_points = [get_naive_point(aig, naive.Strategy.ENERGY_ORIENTED), get_naive_point(aig, naive.Strategy.DELAY_ORIENTED)]
+        pf.find_pareto_frontier(points, naive_points, plot=True)
+        pf.evolution_over_generations(evolutionary_results)
+
+    # Plota circuito
+    if plot_circuit:
+        result = framework.forwarding(aig, best.assignment)
+        framework.colorize(result)
+        graph.show(graph.default(result))
+
+    return { 
+        'best_solution': best, 
+        'solutions': all_individuals,
+        'evolutionary_results': evolutionary_results
+    }
