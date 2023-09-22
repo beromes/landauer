@@ -14,6 +14,8 @@ from operator import attrgetter
 from enum import Enum, auto
 import pprint
 
+from functools import reduce
+
 '''
 Classes/Modelos
 '''
@@ -71,6 +73,9 @@ Etapas algoritmo genetico
 '''
 def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=False):
 
+    # Temporário: Medindo percentual de informação de cada pai
+    gene_prop_results = []
+
     # Variável utilizada para calcular tempo gasto em cada etapa
     global prev_time
     prev_time = time.time()
@@ -118,13 +123,14 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
 
     # Calcula o score baseado na perda de entropia, também calcula o delay
     def fit(population):
-        for p in population:            
+        for p in population:
+            p.forwarding = framework.forwarding(aig, p.assignment) # TODO: Entender porque essa linha é necessária!
             evaluation = evaluate.evaluate(p.forwarding, entropy_s)
             p.score = evaluation['total']
             p.delay = calc_delay(p.forwarding)
 
     # Faz reprodução dos individuos de uma populacao
-    def reproduce(population, rate, strategy = CrossoverStrategy.INPUT):
+    def reproduce(population, rate, strategy = CrossoverStrategy.GATE):
 
         def split_assignment(i: Individual, strategy: CrossoverStrategy):
             if strategy == CrossoverStrategy.INPUT:
@@ -163,11 +169,18 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
             forwarding = framework.forwarding(aig, assignment)
             child = Individual(assignment, forwarding)
 
+            size = len(assignment.items())
+            first = size
+            equal = 0
+            second = 0
+
             #  Mesca com os genes do segundo pai
             for k, v in p2.items():
 
                 # Checa se o valor é igual em ambos os parentes
                 if (child.assignment[k] == v):
+                    equal += 1
+                    first -= 1
                     continue
 
                 # Checa se pode receber a informação do segundo parente
@@ -177,8 +190,17 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
                 child.forwarding.remove_edge(child.assignment[k], k[0])
                 child.forwarding.add_edge(v, k[0])
                 child.assignment[k] = v
+                second += 1
+                first -= 1
 
-            child.forwarding = framework.forwarding(aig, child.assignment) # TODO: Entender porque essa linha é necessária!
+            gene_prop_results.append({
+                'first': first / size,
+                'second': second / size,
+                'equal': equal / size
+            })
+
+
+            # child.forwarding = framework.forwarding(aig, child.assignment) # TODO: Entender porque essa linha é necessária!
             return child
 
         # Código Antigo - corrige o invidíduo após juntar partes arbritariamente
@@ -371,6 +393,11 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
         result = framework.forwarding(aig, best.assignment)
         framework.colorize(result)
         graph.show(graph.default(result))
+
+    size = len(gene_prop_results)
+    for key in ('first', 'second', 'equal'):
+        sum_ = reduce(lambda a, b: a+b, map(lambda i: i[key], gene_prop_results))
+        print(key, sum_ / size)
 
     return { 
         'best_solution': best, 
