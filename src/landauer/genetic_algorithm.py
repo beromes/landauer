@@ -73,9 +73,6 @@ Etapas algoritmo genetico
 '''
 def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=False):
 
-    # Temporário: Medindo percentual de informação de cada pai
-    gene_prop_results = []
-
     # Variável utilizada para calcular tempo gasto em cada etapa
     global prev_time
     prev_time = time.time()
@@ -130,7 +127,7 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
             p.delay = calc_delay(p.forwarding)
 
     # Faz reprodução dos individuos de uma populacao
-    def reproduce(population, rate, strategy = CrossoverStrategy.GATE):
+    def reproduce(population, rate, strategy = CrossoverStrategy.INPUT):
 
         def split_assignment(i: Individual, strategy: CrossoverStrategy):
             if strategy == CrossoverStrategy.INPUT:
@@ -160,82 +157,49 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
                 raise ValueError("Invalid crossover strategy")
 
         def is_valid(forwarding, gate, value):
-            return value not in nx.descendants(forwarding, gate)
-            
-        def make_child(p1, p2):
+            return value not in nx.descendants(forwarding, gate)                    
 
-            # Inicialmente, o filho é uma cópia do primeiro pai
-            assignment = p1.assignment.copy()
+        # Corrige o invidíduo após juntar partes arbritariamente
+        def make_individual(assignment):
             forwarding = framework.forwarding(aig, assignment)
-            child = Individual(assignment, forwarding)
+            invalid_edges = list(assignment.items())
 
-            size = len(assignment.items())
-            first = size
-            equal = 0
-            second = 0
+            while len(invalid_edges) > 0:
+                new_invalid_edges = []
 
-            #  Mesca com os genes do segundo pai
-            for k, v in p2.items():
+                for (key, value) in invalid_edges:
+                    candidates = list(framework.candidates(aig, assignment, key[0], key[1]))
 
-                # Checa se o valor é igual em ambos os parentes
-                if (child.assignment[k] == v):
-                    equal += 1
-                    first -= 1
-                    continue
+                    if value in candidates:
+                        continue
+                    
+                    # TODO: Remover prints quando ficarem irrelevantes
+                    # print('Inválido!', key, value)
+                    if (len(candidates) == 0):
+                        # print('Nenhum candidato! Voltarei para resolver depois')
+                        new_invalid_edges.append((key, value))
+                        continue                        
 
-                # Checa se pode receber a informação do segundo parente
-                if is_valid(child.forwarding, k[0], v) == False:
-                    continue
+                    new_value = random.choice(candidates)
+                    assignment[key] = new_value
+                    forwarding.remove_edge(value, key[0])
+                    forwarding.add_edge(new_value, key[0])
 
-                child.forwarding.remove_edge(child.assignment[k], k[0])
-                child.forwarding.add_edge(v, k[0])
-                child.assignment[k] = v
-                second += 1
-                first -= 1
+                # Caso entre em loop e não consiga resolver as divergências, retorna nulo
+                if (invalid_edges == new_invalid_edges):
+                    if debug:
+                        print('Solução Inválida')
+                    return None;
 
-            gene_prop_results.append({
-                'first': first / size,
-                'second': second / size,
-                'equal': equal / size
-            })
+                invalid_edges = new_invalid_edges
 
-
-            # child.forwarding = framework.forwarding(aig, child.assignment) # TODO: Entender porque essa linha é necessária!
-            return child
-
-        # Código Antigo - corrige o invidíduo após juntar partes arbritariamente
-        # def make_individual(assignment):
-        #     forwarding = framework.forwarding(aig, assignment)
-
-        #     for (key, value) in assignment.items():
-
-        #         if is_valid(forwarding, key[0], value):
-        #             continue
-
-        #         print('Inválido!', key, value)
-        #         candidates = list(framework.candidates(aig, assignment, key[0], key[1]))
-        #         print('Candidatos:', candidates)
-
-        #         if (len(candidates) == 0):
-        #             print(list(filter(lambda i: i[0][0] == key[1], assignment.items())))
-        #             pprint.pprint(assignment)
-        #             framework.colorize(forwarding)
-        #             graph.show(graph.default(forwarding))
-
-        #         new_value = random.choice(candidates)
-
-        #         assignment[key] = new_value
-        #         forwarding.remove_edge(value, key[0])
-        #         forwarding.add_edge(new_value, key[0])
-
-        #     return Individual(assignment, forwarding)
+            return Individual(assignment, forwarding)
 
 
         n_children = int(len(population) * rate)
         children = []
 
-        for i in range(n_children // 2):
-
+        while len(children) < n_children:
             # Escolhe os parentes
             ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
             weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
@@ -247,30 +211,33 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
             splitted_p2 = split_assignment(p2, strategy)
 
             # Cria filhos a partir da combinação dos genes dos pais
-            child1 = make_child(p1, splitted_p2[1])
-            child2 = make_child(p2, splitted_p1[1])
+            # TODO: Explorar estratégia que gera até 4 filhos
+            child1, child2 = p1.assignment.copy(), p2.assignment.copy()
+            child1.update(splitted_p2[1])
+            child2.update(splitted_p1[1])
 
-            # Código antigo: corrige falhas depois
-            # child1, child2 = p1.assignment.copy(), p2.assignment.copy()
-            # child1.update(splitted_p2[1])
-            # child2.update(splitted_p1[1])
-
+            # TODO: Remover prints quando ficarem irrelevantes
             for key in p1.assignment.keys():
-                if key not in child1.assignment.keys():
+                if key not in child1.keys():
                     print('ERRO: Está em p1 mas não em child1', key)
 
-            for key in child1.assignment.keys():
+            for key in child1.keys():
                 if key not in p1.assignment.keys():
                     print('ERRO: Está em child1 mas não em p1', key)
 
             for i in range(len(p1.assignment.keys())):
-                if list(p1.assignment.keys())[i] != list(child1.assignment.keys())[i]:
+                if list(p1.assignment.keys())[i] != list(child1.keys())[i]:
                     print('ERRO: Não estão na mesma ordem!', i)
 
-            children.append(child1)
-            children.append(child2)
+            i1, i2 = make_individual(child1), make_individual(child2)
 
-        return children
+            if i1 is not None:
+                children.append(make_individual(child1))
+            
+            if i2 is not None:
+                children.append(make_individual(child2))
+
+        return children[:n_children]
 
     # Aplica mutacao nos individuos de uma populacao
     def mutate(population, rate, intensity):
@@ -393,11 +360,6 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
         result = framework.forwarding(aig, best.assignment)
         framework.colorize(result)
         graph.show(graph.default(result))
-
-    size = len(gene_prop_results)
-    for key in ('first', 'second', 'equal'):
-        sum_ = reduce(lambda a, b: a+b, map(lambda i: i[key], gene_prop_results))
-        print(key, sum_ / size)
 
     return { 
         'best_solution': best, 

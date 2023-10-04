@@ -26,7 +26,6 @@ def get_random_individual(state):
 def test_designs(n_exec=1):
     
     designs = [
-        #'mcnc_z4ml.json',
         'epfl_testa_ctrl.json',
         # 'epfl_testa_int2float.json',
         # 'epfl_testa_dec.json',
@@ -39,7 +38,7 @@ def test_designs(n_exec=1):
             'name': 'Teste Leve',
             'w_energy': 1,
             'w_delay': 0,
-            'n_generations': 100,
+            'n_generations': 50,
             'n_initial_individuals': 10,
             'reproduction_rate': 1,
             'mutation_rate': 0.1,
@@ -68,6 +67,6 @@ def test_designs(n_exec=1):
         for params in param_map:
             for i in range(n_exec):
                 print(params['name'] + ' - Execução ' + str(i))
-                ga.genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=False)                
+                ga.genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=True)                
 
 test_designs()
