@@ -29,8 +29,10 @@ import logging
 import matplotlib.pyplot as plt
 import networkx as nx
 import pydot
+import seaborn as sns
 import sys
 
+from collections import deque
 from io import BytesIO
 from PIL import Image
 
@@ -50,6 +52,41 @@ def _set_hierarchical_level(dag):
                 if dag.nodes[u]['level'] + 1 > dag.nodes[v].get('level', 0):
                     dag.nodes[v]['level'] = dag.nodes[u]['level'] + 1
                     pending.append(v)
+
+def _level(dag):
+    graph = graphviz.Graph()
+    subgraphs = {}
+
+    for node, attr in dag.nodes(data=True):
+        level = attr.get('level', 0)
+        subgraphs.setdefault(level, graphviz.Graph())
+        subgraphs[level].node(str(node), **(attr.get('attributes', {})))
+
+    # First level has rank set to 'source'
+    top = subgraphs.pop(0)
+    top.attr(rank = 'source')
+    graph.subgraph(top)
+
+    # Last level has rank set to 'sink'
+    if len(subgraphs) > 0:
+        bottom = subgraphs.pop(max(subgraphs))
+        bottom.attr(rank = 'sink')
+        graph.subgraph(bottom)
+
+    for level, subgraph in subgraphs.items():
+        subgraph.attr(rank = 'same')
+        graph.subgraph(subgraph)
+
+    graph.attr(rankdir = 'TB')
+    for u, v, attributes in dag.edges(data='attributes', default={}):
+        graph.edge(str(u), str(v), **attributes)
+    
+    return graph
+
+def _next_color(palette):
+    color = palette[0]
+    palette.rotate(1)
+    return color
 
 def paper(dag):
     dag = nx.MultiDiGraph(dag)
@@ -94,65 +131,60 @@ def paper(dag):
         }
 
     # Set edges:
-    for u,v,k in dag.edges(keys=True):
-        '''
-        dag.edges[u,v,k]['attributes'] = {
+    palette = deque(sns.color_palette('colorblind').as_hex())
+    colors = dict()
+    for u, v, key, forward in dag.edges(keys=True, data='forward'):
+        forwarded = any(k == u and f for _, _, k, f in dag.out_edges(v, keys=True, data='forward', default=False))
+        color = colors.setdefault(u, _next_color(palette)) if forwarded else colors.setdefault(key, _next_color(palette)) if forward else '#00000032'
+        dag.edges[u,v,key]['attributes'] = {
             'arrowsize' : '0.4',
-            'color' : '#00000032',
-            'fillcolor' : '#000000',
+            'color' : color,
             'penwidth' : '1.0',
-            'style' : ('dashed' if dag.edges[u,v,k]['inverter'] else 'solid')
-        }
-        '''
-        dag.edges[u,v,k]['attributes'] = {
-            'arrowsize' : '0.4',
-            'color' : dag.edges[u, v, k]['attributes']['color'] if 'attributes' in dag.edges[u, v, k] and 'color' in dag.edges[u, v, k]['attributes'] else '#00000032',
-            'penwidth' : '1.0',
-            'style' : ('dashed' if dag.edges[u,v,k]['inverter'] else 'solid')
+            'style' : ('dashed' if dag.edges[u,v,key]['inverter'] else 'solid')
         }
     
     return _level(dag)
-        
-def _level(dag):
-    graph = graphviz.Graph()
-    subgraphs = {}
-
-    for node, attr in dag.nodes(data=True):
-        level = attr.get('level', 0)
-        subgraphs.setdefault(level, graphviz.Graph())
-        subgraphs[level].node(str(node), **(attr.get('attributes', {})))
-
-    # First level has rank set to 'source'
-    top = subgraphs.pop(0)
-    top.attr(rank = 'source')
-    graph.subgraph(top)
-
-    # Last level has rank set to 'sink'
-    if len(subgraphs) > 0:
-        bottom = subgraphs.pop(max(subgraphs))
-        bottom.attr(rank = 'sink')
-        graph.subgraph(bottom)
-
-    for level, subgraph in subgraphs.items():
-        subgraph.attr(rank = 'same')
-        graph.subgraph(subgraph)
-
-    graph.attr(rankdir = 'TB')
-    for u, v, attributes in dag.edges(data='attributes', default={}):
-        graph.edge(str(u), str(v), **attributes)
-    
-    return graph
 
 def default(dag):
+    dag = nx.MultiDiGraph(dag)
+    palette = deque(sns.color_palette('colorblind').as_hex())
+    colors = dict()
     graph = graphviz.Digraph(strict = False)
     for node, attributes in dag.nodes(data='attributes', default={}):
         graph.node(str(node), **attributes)
-    for u, v, attr in dag.edges(data=True):
-        inverter = attr.get('inverter', False)
-        attributes = attr.get('attributes', {})
-        attributes.setdefault('style', 'dashed' if inverter else 'solid')
+    for u, v, key, data in dag.edges(keys=True, data=True):
+        inverter = data.get('inverter', False)
+        forward = data.get('forward', False)
+        forwarded = any(k == u and f for _, _, k, f in dag.out_edges(v, keys=True, data='forward', default=False))
+        color = colors.setdefault(u, _next_color(palette)) if forwarded else colors.setdefault(key, _next_color(palette)) if forward else '#000000'
+        attributes = {
+            'style' : 'dashed' if inverter else 'solid',
+            'color' : color
+        }
+        attributes.update(data.get('attributes', {}))
         graph.edge(str(u), str(v), **attributes)
     return graph
+
+def weighted(dag):
+    dag = nx.MultiDiGraph(dag)
+    for node in dag.nodes():
+        dag.nodes[node]['attributes'] = {
+            'label' : '',
+            'shape' : 'circle',
+            'width' : '0.1'
+        }
+    
+    cmap = sns.color_palette("flare", as_cmap=True)
+    for u, v, k, data in dag.edges(keys=True, data=True):
+        attributes = {}
+        if 'opportunity' in data and 'candidate' in data:
+            node, parent = data['opportunity']
+            candidate = data['candidate']
+            weight = f" ({data['weight']})" if 'weight' in data else ''
+            attributes['label'] = f'{candidate} -{parent}-> {node}{weight}'
+        dag.edges[u,v,k].setdefault('attributes', {}).update(attributes)
+
+    return default(dag)
 
 def show(dot):
     graphs = pydot.graph_from_dot_data(dot.source)
@@ -166,7 +198,7 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--show', help="show graph using matplotlib", action="store_true")
 
-    mode = {'paper' : paper, 'default' : default}
+    mode = {'paper' : paper, 'default' : default, 'weighted' : weighted}
     argparser.add_argument('--type', choices=mode.keys(), help='graph type', required=True)
     
     group = argparser.add_mutually_exclusive_group(required=True)
