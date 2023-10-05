@@ -25,10 +25,8 @@ SOFTWARE.
 import argparse
 import json
 import networkx as nx
-import seaborn as sns
 import sys
 
-from collections import deque
 from enum import Enum, auto
 from operator import itemgetter
 
@@ -51,26 +49,22 @@ def _set_hierarchical_level(dag):
 
 def _get_simple_edge(aig, u, v):
     edges = [key for key in aig.succ[u][v].keys() if not aig.edges[u, v, key].get('forward', False)]
-    if len(edges) != 1:
-        import landauer.graph as graph
-        graph.show(graph.default(aig))
-    assert len(edges) == 1, f'Expected a single edge between nodes \'{u}\' and \'{v}\''
+    assert len(edges) == 1, f'Expected a single non-forwarding edge between nodes \'{u}\' and \'{v}\''
     return edges[0]
 
 
 class Strategy(Enum):
-    DELAY_ORIENTED = auto()
+    DEPTH_ORIENTED = auto()
     ENERGY_ORIENTED = auto()
 
-def naive(aig, strategy = Strategy.DELAY_ORIENTED, palette = 'colorblind'):
+def naive(aig, strategy = Strategy.DEPTH_ORIENTED):
     '''
     References
     ----------
     CHAVES, J. et all. Designing Partially Reversible Field-Coupled 
     Nanocomputing Circuits. IEEE Transactions on Nanotechnology, Volume 18, 2019
     '''
-    palette = deque(sns.color_palette(palette).as_hex())
-    return _build_chain(aig, strategy, palette)
+    return _build_chain(aig, strategy)
 
 def _ranked_children(aig, node):
     _set_hierarchical_level(aig)
@@ -96,12 +90,12 @@ def _choose(aig, strategy, children):
     full = set(child for child in children if len(set(key for _, _, key, forward in aig.out_edges(child, keys=True, data='forward', default=False) if forward)) == 2)
 
     choices = list(children - (outputs | full))
-    if strategy == Strategy.DELAY_ORIENTED:
+    if strategy == Strategy.DEPTH_ORIENTED:
         return set(choices[:1])
 
     return set(choices[:])
 
-def _make_chain(aig, palette, node, choices, outputs):
+def _make_chain(aig, node, choices, outputs):
     '''
     "It selects a non-recyclable node, e.g., an output, to be at the bottom of 
     the chain. After selection of the children, the algorithm links their inputs 
@@ -113,15 +107,11 @@ def _make_chain(aig, palette, node, choices, outputs):
     key = _get_simple_edge(aig, node, last)
     last_is_inverted = aig.edges[node, last, key]['inverter']
 
-    color = palette[0]
-    palette.rotate(1)
-    aig.edges[node, last, key].setdefault('attributes', {}).update({'color':color})
-
     for choice in choices:
         key = _get_simple_edge(aig, node, choice)
         choice_is_inverted = aig.edges[node, choice, key]['inverter']
         aig.remove_edge(node, choice, key)
-        aig.add_edge(last, choice, node, forward = True, inverter = (choice_is_inverted != last_is_inverted), attributes = {'color': color})
+        aig.add_edge(last, choice, node, forward = True, inverter = (choice_is_inverted != last_is_inverted))
         last = choice
         last_is_inverted = choice_is_inverted
 
@@ -129,9 +119,9 @@ def _make_chain(aig, palette, node, choices, outputs):
         key = _get_simple_edge(aig, node, output)
         output_is_inverted = aig.edges[node, output, key]['inverter']
         aig.remove_edge(node, output, key)
-        aig.add_edge(last, output, node, forward = True, inverter = output_is_inverted != last_is_inverted, attributes = {'color': color})
+        aig.add_edge(last, output, node, forward = True, inverter = output_is_inverted != last_is_inverted)
 
-def _build_chain(aig, strategy, palette):
+def _build_chain(aig, strategy):
     '''
     Algorithm 1: Building Chains of n-bits Recycling Gates
     data : netlist <- circuit's netlist
@@ -163,25 +153,9 @@ def _build_chain(aig, strategy, palette):
 
             # "Finally, when the chain is complete, i.e., 
             # there are no sets left:"
-            _make_chain(aig, palette, node, choices, outputs)
+            _make_chain(aig, node, choices, outputs)
 
     return aig
-
-def benchmark(aig, entropy, settings):
-    assert 'strategy' in settings, "strategy is required"
-    strategy = Strategy.ENERGY_ORIENTED if settings['strategy'] == 'energy_oriented' else Strategy.DELAY_ORIENTED
-    
-    from timeit import default_timer as timer
-    start = timer()
-    forwards = naive(aig, strategy)
-    time = timer() - start
-
-    delay = len(nx.dag_longest_path(aig))
-
-    import landauer.evaluate as evaluate
-    loss = evaluate.evaluate(forwards, entropy)['total']
-
-    return {"time" : time, "delay" : delay, "loss" : loss}
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -190,7 +164,7 @@ def main():
     group.add_argument('--file', help='and-inverter graph file', type=argparse.FileType('r'))
     group.add_argument('--stdin', help='read input data (and-inverter graph file) from stdin', action='store_true')
     
-    strategy = {'energy_oriented' : Strategy.ENERGY_ORIENTED, 'delay_oriented': Strategy.DELAY_ORIENTED}
+    strategy = {'energy_oriented' : Strategy.ENERGY_ORIENTED, 'depth_oriented': Strategy.DEPTH_ORIENTED}
     argparser.add_argument('strategy', choices=strategy.keys(), help='Naive (CHAVES, 2019)')
 
     args = argparser.parse_args()
