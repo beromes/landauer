@@ -344,7 +344,7 @@ def _natural_selection(old_generation, new_generation, elitism_rate):
     return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
 
 
-def genetic(aig, params, plot_results=True, plot_circuit=False, show_debug_messages=False):
+def genetic(aig, entropy_data, params, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
     global debug
@@ -362,7 +362,7 @@ def genetic(aig, params, plot_results=True, plot_circuit=False, show_debug_messa
         raise ValueError("A soma dos pesos deve ser igual a 1")
 
     # Simula circuito
-    entropy_s = entropy.entropy(aig)
+    entropy_s = entropy_data
 
     # Calcula energia e profundidade iniciais
     initial_energy = evaluate.evaluate(aig, entropy_s)['total']
@@ -402,7 +402,7 @@ def genetic(aig, params, plot_results=True, plot_circuit=False, show_debug_messa
             evolutionary_results['generation_best'].append(best.score)
             evolutionary_results['generation_worst'].append(worst.score)
 
-        print("Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
+        print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
         # Passo 3 - Reprodução
         new_generation = _reproduce(aig, population, params.reproduction_rate)
