@@ -42,6 +42,11 @@ from functools import reduce
 '''
 Classes/Modelos
 '''
+class CrossoverStrategy(Enum):
+    LEVEL = auto()
+    GATE = auto()
+    INPUT = auto()
+
 class ParamMap:
     name = 'Padrao'
     w_energy = 1
@@ -52,6 +57,7 @@ class ParamMap:
     mutation_rate = 0.2
     mutation_intensity = 0.8
     elitism_rate = 0.1
+    crossover_strategy = CrossoverStrategy.GATE
 
     def __init__(self, dictt):
         if type(dictt) is dict:          
@@ -67,11 +73,6 @@ class Individual:
     def __init__(self, assignment, forwarding):
         self.assignment = assignment
         self.forwarding = forwarding
-
-class CrossoverStrategy(Enum):
-    LEVEL = auto()
-    GATE = auto()
-    INPUT = auto()
 
 '''
 Funcoes auxiliares
@@ -174,8 +175,7 @@ def _fit(population, entropy_s):
         p.delay = _calc_delay(p.forwarding)
 
 # Faz reprodução dos individuos de uma populacao
-def _reproduce(aig, population, rate, strategy=CrossoverStrategy.GATE):
-
+def _reproduce(aig, population, rate, strategy):
     def split_assignment(i: Individual, strategy: CrossoverStrategy):
         if strategy == CrossoverStrategy.INPUT:
             keys = list(i.assignment.keys())
@@ -411,7 +411,7 @@ def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circu
         print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
         # Passo 3 - Reprodução
-        new_generation = _reproduce(aig, population, params.reproduction_rate)
+        new_generation = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
         _log('Reprodução')
 
         # Passo 4 - Mutação
