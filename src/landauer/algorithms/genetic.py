@@ -344,7 +344,7 @@ def _natural_selection(old_generation, new_generation, elitism_rate):
     return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
 
 
-def genetic(aig, entropy_data, params, plot_results=False, plot_circuit=False, show_debug_messages=False):
+def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
     global debug
@@ -356,6 +356,12 @@ def genetic(aig, entropy_data, params, plot_results=False, plot_circuit=False, s
 
     # Converte dicionario de entrada para uma classe mapeada
     params = ParamMap(params)
+
+    # Define semente para randomização
+    if seed is None:
+        seed = random.randrange(2**32)
+    random.seed(seed)
+    np.random.seed(seed)
 
     # Valida entradas
     if params.w_delay + params.w_energy != 1:
@@ -452,5 +458,6 @@ def genetic(aig, entropy_data, params, plot_results=False, plot_circuit=False, s
     return { 
         'best_solution': best, 
         'solutions': all_individuals,
-        'evolutionary_results': evolutionary_results
+        'evolutionary_results': evolutionary_results,
+        'seed': seed
     }
