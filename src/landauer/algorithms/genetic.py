@@ -28,6 +28,7 @@ import landauer.evaluate as evaluate
 import landauer.algorithms.naive as naive
 import landauer.graph as graph
 import landauer.pareto_frontier as pf
+import landauer.placement as placement
 import networkx as nx
 import numpy as np
 import random
@@ -97,27 +98,10 @@ def _get_single_edge(aig, u, v):
     return edges[0] if len(edges) == 1 else None
 
 def _assignment(aig):
-    assignment_ = dict()
-    for node in aig.nodes():
-        children = set(aig.successors(node))
-        if len(children) >= 2:
-            assignment_.update({(child, node): node for child in children})
-    return assignment_
+    return placement.placement(aig)
 
 def _forwarding(aig, assignment):
-    forwarding_ = nx.MultiDiGraph(aig)
-    for key, source in assignment.items():
-        gate, input_ = key
-        if (source == input_):
-            continue
-        
-        inverter = aig.edges[input_, source].get('inverter', False) != aig.edges[input_, gate].get('inverter', False)
-        forwarding_.add_edge(source, gate, key = input_, forward = True, inverter = inverter)
-        edge = _get_single_edge(forwarding_, input_, gate)
-        assert edge != None, f'Expected edge between \'{input_}\' and \'{gate}\''
-        forwarding_.remove_edge(input_, gate, edge)
-
-    return forwarding_
+    return placement.place(aig, assignment)
 
 def _randomize(aig, assignment, forwarding):
     assignment_ = assignment.copy()
