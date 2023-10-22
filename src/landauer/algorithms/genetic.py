@@ -328,7 +328,7 @@ def _natural_selection(old_generation, new_generation, elitism_rate):
     return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
 
 
-def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circuit=False, show_debug_messages=False):
+def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
     global debug
@@ -337,6 +337,7 @@ def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circu
     # Variável utilizada para calcular tempo gasto em cada etapa
     global prev_time
     prev_time = time.time()
+    initial_time = prev_time
 
     # Converte dicionario de entrada para uma classe mapeada
     params = ParamMap(params)
@@ -384,6 +385,11 @@ def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circu
     all_individuals = set(population)
 
     for i in range(params.n_generations):
+
+        if time.time() - initial_time > timeout:
+            _log('Timeout!')
+            break
+
         # Encontra melhor e pior
         best = min(population, key=attrgetter('score'))
         worst = max(population, key=attrgetter('score'))
@@ -443,5 +449,6 @@ def genetic(aig, entropy_data, params, seed=None, plot_results=False, plot_circu
         'best_solution': best, 
         'solutions': all_individuals,
         'evolutionary_results': evolutionary_results,
-        'seed': seed
+        'seed': seed,
+        'execution_time': time.time() - initial_time
     }
