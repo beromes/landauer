@@ -98,7 +98,12 @@ def _get_single_edge(aig, u, v):
     return edges[0] if len(edges) == 1 else None
 
 def _assignment(aig):
-    return placement.placement(aig)
+    assignment_ = dict()
+    for node in aig.nodes():
+        children = set(aig.successors(node))
+        if len(children) >= 2:
+            assignment_.update({(child, node): node for child in children})
+    return assignment_
 
 def _forwarding(aig, assignment):
     return placement.place(aig, assignment)
