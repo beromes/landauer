@@ -52,12 +52,12 @@ class ParamMap:
     name = 'Padrao'
     w_energy = 1
     w_delay = 0
-    n_generations = 1000
+    n_generations = 600
     n_initial_individuals = 50
     reproduction_rate = 1.0
-    mutation_rate = 0.2
-    mutation_intensity = 0.8
-    elitism_rate = 0.1
+    mutation_rate = 0.1
+    mutation_intensity = 0.15
+    elitism_rate = 0.15
     crossover_strategy = CrossoverStrategy.GATE
 
     def __init__(self, dictt):
@@ -364,9 +364,10 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     initial_energy = evaluate.evaluate(aig, entropy_s)['total']
     initial_delay = _calc_delay(aig)
 
-    print('Energia e Delay inciais')
-    print(initial_energy)
-    print(initial_delay)
+    if show_debug_messages:
+        print('Energia e Delay inciais')
+        print(initial_energy)
+        print(initial_delay)
 
     # Inicia conjunto com todas as soluções
     all_individuals = set()
@@ -375,7 +376,8 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     evolutionary_results = {
         'global_best': [],
         'generation_best': [],
-        'generation_worst': []
+        'generation_worst': [],
+        'solutions': []
     }
 
     # Passo 1 - Definir a população inicial
@@ -388,6 +390,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     
     # Inicia conjunto com todas as soluções
     all_individuals = set(population)
+    evolutionary_results['solutions'].append(set(population))
 
     for i in range(params.n_generations):
 
@@ -398,12 +401,13 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         # Encontra melhor e pior
         best = min(population, key=attrgetter('score'))
         worst = max(population, key=attrgetter('score'))
-        evolutionary_results['global_best'].append(best.score)
+        evolutionary_results['global_best'].append(best.score)        
         if (i == 0):
             evolutionary_results['generation_best'].append(best.score)
             evolutionary_results['generation_worst'].append(worst.score)
 
-        print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
+        if show_debug_messages:
+            print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
         # Passo 3 - Reprodução
         new_generation = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
@@ -427,7 +431,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         # Salva os resultados da geração
         evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
         evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
-
+        evolutionary_results['solutions'].append(set(new_generation))
 
     # Encontra melhor solução geral
     best = min(population, key=attrgetter('score'))
