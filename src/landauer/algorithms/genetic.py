@@ -240,7 +240,7 @@ def _reproduce(aig, population, rate, strategy):
     weights = weights / np.sum(weights) # divide pela soma dos pesos para que a soma total seja 1
 
     # Conta número de soluções inválidas
-    invalid_count = 0
+    n_invalids = 0
 
     while len(children) < n_children:
         # Escolhe os parentes
@@ -274,17 +274,17 @@ def _reproduce(aig, population, rate, strategy):
         if i1 is not None:
             children.append(i1)
         else:
-            invalid_count += 1
+            n_invalids += 1
         
         if i2 is not None:
             children.append(i2)
         else:
-            invalid_count += 1
+            n_invalids += 1
 
     if debug:
-        print('[ERROR] Soluções inválidas: ', invalid_count, invalid_count / n_children)
+        print('[ERROR] Soluções inválidas: ', n_invalids, n_invalids / n_children)
 
-    return children[:n_children]
+    return children[:n_children], n_invalids
 
 # Aplica mutacao nos individuos de uma populacao
 def _mutate(aig, population, rate, intensity):
@@ -380,6 +380,9 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'solutions': []
     }
 
+    # Conta o número total de indivíduos inválidos
+    n_invalids = 0
+
     # Passo 1 - Definir a população inicial
     population = _init_population(aig, params.n_initial_individuals)
     _log('Definir população inicial')
@@ -410,7 +413,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
             print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
         # Passo 3 - Reprodução
-        new_generation = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
+        new_generation, new_invalids = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
         _log('Reprodução')
 
         # Passo 4 - Mutação
@@ -432,6 +435,9 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
         evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
         evolutionary_results['solutions'].append(set(new_generation))
+
+        # Conta novos indivíduos inválidos
+        n_invalids += new_invalids
 
     # Encontra melhor solução geral
     best = min(population, key=attrgetter('score'))
@@ -459,5 +465,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'solutions': all_individuals,
         'evolutionary_results': evolutionary_results,
         'seed': seed,
-        'execution_time': time.time() - initial_time
+        'execution_time': time.time() - initial_time,
+        'n_invalids': n_invalids
     }
