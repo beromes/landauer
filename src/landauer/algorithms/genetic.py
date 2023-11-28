@@ -108,20 +108,18 @@ def _assignment(aig):
 def _forwarding(aig, assignment):
     return placement.place(aig, assignment)
 
+def _replace(aig, assignment, forwarding, slot, new_value):
+    return placement.replace(aig, assignment, forwarding, slot, new_value)
+
 def _randomize(aig, assignment, forwarding):
     assignment_ = assignment.copy()
     forwarding_ = forwarding.copy()
     assignment_items = list(assignment_.keys())
     random.shuffle(assignment_items)
     for gate, input_ in assignment_items:
-        candidates_ = list(_candidates(aig, forwarding_, gate, input_))
-        assignment_[(gate, input_)] = random.choice(candidates_)
-        forwarding_ = _forwarding(aig, assignment_)
-        # old_value = assignment_[(gate, input_)]
-        # new_value = random.choice(candidates_)
-        # assignment_[(gate, input_)] = new_value
-        # forwarding_.remove_edge(old_value, gate)
-        # forwarding_.add_edge(new_value, gate)
+        candidates = placement.candidates(aig, forwarding_, gate, input_)
+        new_value = random.choice(candidates)
+        assignment_, forwarding_ = _replace(aig, assignment_, forwarding_, (gate, input_), new_value)                
 
     return assignment_, forwarding_
 
@@ -195,6 +193,7 @@ def _reproduce(aig, population, rate, strategy):
     # Verifica se determinada atribuição é válida
     def is_valid(forwarding, dest_gate, origin_gate):
         return origin_gate not in nx.descendants(forwarding, dest_gate)
+        #return nx.has_path(forwarding, dest_gate, origin_gate) == False
 
     # Corrige o invidíduo após juntar as duas partes
     def make_individual(aig, assignment):
@@ -209,16 +208,13 @@ def _reproduce(aig, population, rate, strategy):
                 if is_valid(forwarding, key[0], value):
                     continue
                 
-                candidates = list(_candidates(aig, forwarding, key[0], key[1]))
+                candidates = placement.candidates(aig, forwarding, key[0], key[1])
                 if (len(candidates) == 0):
                     new_invalid_edges.append((key, value))
-                    continue                        
+                    continue
 
                 new_value = random.choice(candidates)
-                assignment[key] = new_value
-                forwarding = _forwarding(aig, assignment)
-                # forwarding.remove_edge(value, key[0])
-                # forwarding.add_edge(new_value, key[0])
+                assignment, forwarding = _replace(aig, assignment, forwarding, key, new_value)
 
             # Caso entre em loop e não consiga resolver as divergências, retorna nulo
             if (invalid_edges == new_invalid_edges):
