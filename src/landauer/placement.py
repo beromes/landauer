@@ -45,7 +45,7 @@ def _full(forwarding, parent, source):
     '''
     forwarded = set(key for _, _, key, f in forwarding.out_edges(source, keys=True, data='forward', default=False) if f)
     assert len(forwarded) <= 2, f"Expected gate '{source}' forwarding at most two inputs. Got {len(forwarded)}"
-    return not (parent in forwarded or len(forwarded) < 2)
+    return not (parent == source or parent in forwarded or len(forwarded) < 2)
 
 def _reachable(forwarding, node, source):
     '''
@@ -53,6 +53,20 @@ def _reachable(forwarding, node, source):
     If true, 'source' cannot forward information to 'node', since it will create a loop
     '''
     return nx.has_path(forwarding, node, source)
+
+def candidates(aig, forwarding, node, source):
+    candidates = (set(aig.successors(source)) | {source})
+
+    def filter_candidates(c):
+        return (
+            _full(forwarding, source, c) == False and # Majority Support
+            _is_output(forwarding, c) == False and # Outputs cannot forward information
+            _reachable(forwarding, node, c) == False and # Prevent cycles
+            c != node # Can't forward to himself
+        )
+
+    return list(filter(filter_candidates, candidates))
+
 
 def slots(aig):
     forwarding = aig if isinstance(aig, nx.MultiDiGraph) else nx.MultiDiGraph(aig)
@@ -94,6 +108,53 @@ def place(aig, placement):
         forwarding.remove_edge(parent, node, keys[0])
     
     return forwarding
+
+def _compare_graphs(graph1, graph2):
+    # Find edges present in graph1 but not in graph2
+    edges_added = graph1.edges - graph2.edges
+
+    # Find edges present in graph2 but not in graph1
+    edges_removed = graph2.edges - graph1.edges
+
+    # Find edges with different attributes
+    edges_modified = set()
+    for edge in graph1.edges:
+        if edge in graph2.edges:
+            if graph1[edge[0]][edge[1]] != graph2[edge[0]][edge[1]]:
+                edges_modified.add(edge)
+
+    if len(edges_added) > 0 or len(edges_removed) > 0 or len(edges_modified) > 0:
+        print("Edges added:", edges_added)
+        print("Edges removed:", edges_removed)
+        print("Edges with modified attributes:", edges_modified)
+
+def replace(aig, placement, forwarding, slot, new_source):
+    old_source = placement[slot]
+
+    # Does nothing if it is the same source
+    if old_source == new_source:
+        return placement, forwarding
+
+    node, parent = slot
+
+    # Remove previous edge
+    if forwarding.has_edge(old_source, node, key=parent):
+        forwarding.remove_edge(old_source, node, key=parent)
+    else:
+        forwarding.remove_edge(old_source, node)
+
+    # Add new edge
+    if new_source == parent:
+        inverter = aig.edges[parent, node].get('inverter', False)
+        forwarding.add_edge(new_source, node, inverter=inverter)
+    else:
+        inverter = aig.edges[parent, node].get('inverter', False) != aig.edges[parent, new_source].get('inverter', False)
+        forwarding.add_edge(new_source, node, key=parent, forward=True, inverter=inverter)
+
+    placement[slot] = new_source
+
+    return placement, forwarding
+
 
 def serialize(placement):
     return json.dumps([{'node' : slot[0], 'parent' : slot[1], 'source' : source} for slot, source in placement.items()])
