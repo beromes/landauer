@@ -189,7 +189,7 @@ def genetic_algorithm(aig, params, plot_results=True, plot_circuit=False, debug=
                 if (invalid_edges == new_invalid_edges):
                     if debug:
                         print('Solução Inválida')
-                    return None;
+                    return None
 
                 invalid_edges = new_invalid_edges
 

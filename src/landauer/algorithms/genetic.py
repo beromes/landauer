@@ -195,36 +195,52 @@ def _reproduce(aig, population, rate, strategy):
         return origin_gate not in nx.descendants(forwarding, dest_gate)
         #return nx.has_path(forwarding, dest_gate, origin_gate) == False
 
-    # Corrige o invidíduo após juntar as duas partes
-    def make_individual(aig, assignment):
+    # Monta um indivíduo a partir das duas partes do crossover
+    def make_individual(aig, first_half, second_half):
+        assignment = _assignment(aig)
         forwarding = _forwarding(aig, assignment)
-        invalid_edges = list(assignment.items())
+        n_invalid_items = 0
 
-        while len(invalid_edges) > 0:
-            new_invalid_edges = []
-
-            for (key, value) in invalid_edges:
-                
-                if is_valid(forwarding, key[0], value):
-                    continue
-                
-                candidates = placement.candidates(aig, forwarding, key[0], key[1])
-                if (len(candidates) == 0):
-                    new_invalid_edges.append((key, value))
-                    continue
-
-                new_value = random.choice(candidates)
+        for key in assignment.keys():
+            new_value = first_half[key] if key in first_half else second_half[key]
+            
+            if is_valid(forwarding, key[0], new_value):
                 assignment, forwarding = _replace(aig, assignment, forwarding, key, new_value)
+            else:
+                n_invalid_items += 1
 
-            # Caso entre em loop e não consiga resolver as divergências, retorna nulo
-            if (invalid_edges == new_invalid_edges):
-                if debug:
-                    print('[ERROR] Loop detectado - Indivíduo descartada')
-                return None;
+        return Individual(assignment, forwarding), n_invalid_items
 
-            invalid_edges = new_invalid_edges
+    # Corrige o invidíduo após juntar as duas partes
+    # def make_individual(aig, assignment):
+    #     forwarding = _forwarding(aig, assignment)
+    #     invalid_edges = list(assignment.items())
 
-        return Individual(assignment, forwarding)
+    #     while len(invalid_edges) > 0:
+    #         new_invalid_edges = []
+
+    #         for (key, value) in invalid_edges:
+                
+    #             if is_valid(forwarding, key[0], value):
+    #                 continue
+                
+    #             candidates = placement.candidates(aig, forwarding, key[0], key[1])
+    #             if (len(candidates) == 0):
+    #                 new_invalid_edges.append((key, value))
+    #                 continue
+
+    #             new_value = random.choice(candidates)
+    #             assignment, forwarding = _replace(aig, assignment, forwarding, key, new_value)
+
+    #         # Caso entre em loop e não consiga resolver as divergências, retorna nulo
+    #         if (invalid_edges == new_invalid_edges):
+    #             if debug:
+    #                 print('[ERROR] Loop detectado - Indivíduo descartada')
+    #             return None;
+
+    #         invalid_edges = new_invalid_edges
+
+    #     return Individual(assignment, forwarding)
 
 
     n_children = int(len(population) * rate)
@@ -237,6 +253,10 @@ def _reproduce(aig, population, rate, strategy):
 
     # Conta número de soluções inválidas
     n_invalids = 0
+    
+    # Conta a quantidade de itens que nao foram modificados
+    n_items = len(population[0].assignment.items()) * n_children
+    n_invalid_items = 0
 
     while len(children) < n_children:
         # Escolhe os parentes
@@ -246,41 +266,52 @@ def _reproduce(aig, population, rate, strategy):
         splitted_p1 = split_assignment(p1, strategy)
         splitted_p2 = split_assignment(p2, strategy)
 
-        # Cria filhos a partir da combinação dos genes dos pais
-        # TODO: Explorar estratégia que gera até 4 filhos
-        child1, child2 = p1.assignment.copy(), p2.assignment.copy()
-        child1.update(splitted_p2[1])
-        child2.update(splitted_p1[1])
+        child1, n_invalid_items1 = make_individual(aig, splitted_p1[0], splitted_p2[1])
+        child2, n_invalid_items2 = make_individual(aig, splitted_p2[0], splitted_p1[1])
+        children.extend([child1, child2])
 
-        # TODO: Remover prints quando ficarem irrelevantes
-        for key in p1.assignment.keys():
-            if key not in child1.keys():
-                print('ERRO: Está em p1 mas não em child1', key)
+        n_invalid_items += n_invalid_items1 + n_invalid_items2
 
-        for key in child1.keys():
-            if key not in p1.assignment.keys():
-                print('ERRO: Está em child1 mas não em p1', key)
+        if debug:
+            invalids = n_invalid_items1 + n_invalid_items2
+            n_edges = len(child1.assignment.items()) * 2
+            print('[ERROR] Atribuições invalidas na reprodução: ', invalids, (invalids / n_edges) * 100)
 
-        for i in range(len(p1.assignment.keys())):
-            if list(p1.assignment.keys())[i] != list(child1.keys())[i]:
-                print('ERRO: Não estão na mesma ordem!', i)
+        # # Cria filhos a partir da combinação dos genes dos pais
+        # # TODO: Explorar estratégia que gera até 4 filhos
+        # child1, child2 = p1.assignment.copy(), p2.assignment.copy()
+        # child1.update(splitted_p2[1])
+        # child2.update(splitted_p1[1])
 
-        i1, i2 = make_individual(aig, child1), make_individual(aig, child2)
+        # # TODO: Remover prints quando ficarem irrelevantes
+        # for key in p1.assignment.keys():
+        #     if key not in child1.keys():
+        #         print('ERRO: Está em p1 mas não em child1', key)
 
-        if i1 is not None:
-            children.append(i1)
-        else:
-            n_invalids += 1
+        # for key in child1.keys():
+        #     if key not in p1.assignment.keys():
+        #         print('ERRO: Está em child1 mas não em p1', key)
+
+        # for i in range(len(p1.assignment.keys())):
+        #     if list(p1.assignment.keys())[i] != list(child1.keys())[i]:
+        #         print('ERRO: Não estão na mesma ordem!', i)
+
+        # i1, i2 = make_individual(aig, child1), make_individual(aig, child2)
+
+        # if i1 is not None:
+        #     children.append(i1)
+        # else:
+        #     n_invalids += 1
         
-        if i2 is not None:
-            children.append(i2)
-        else:
-            n_invalids += 1
+        # if i2 is not None:
+        #     children.append(i2)
+        # else:
+        #     n_invalids += 1
 
-    if debug:
-        print('[ERROR] Soluções inválidas: ', n_invalids, n_invalids / n_children)
+    # if debug:
+    #     print('[ERROR] Soluções inválidas: ', n_invalids, n_invalids / n_children)
 
-    return children[:n_children], n_invalids
+    return children[:n_children], n_invalids, n_invalid_items / n_items
 
 # Aplica mutacao nos individuos de uma populacao
 def _mutate(aig, population, rate, intensity):
@@ -378,6 +409,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
 
     # Conta o número total de indivíduos inválidos
     n_invalids = 0
+    sum_percentual_invalid_items = 0
 
     # Passo 1 - Definir a população inicial
     population = _init_population(aig, params.n_initial_individuals)
@@ -409,7 +441,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
             print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
 
         # Passo 3 - Reprodução
-        new_generation, new_invalids = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
+        new_generation, new_invalids, percentual_invalid_items = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
         _log('Reprodução')
 
         # Passo 4 - Mutação
@@ -434,6 +466,9 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
 
         # Conta novos indivíduos inválidos
         n_invalids += new_invalids
+
+        # Soma percentual de atribuicoes invalidas
+        sum_percentual_invalid_items += percentual_invalid_items
 
     # Encontra melhor solução geral
     best = min(population, key=attrgetter('score'))
@@ -462,5 +497,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'evolutionary_results': evolutionary_results,
         'seed': seed,
         'execution_time': time.time() - initial_time,
-        'n_invalids': n_invalids
+        'n_invalids': n_invalids,
+        'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best'])
     }
