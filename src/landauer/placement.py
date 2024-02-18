@@ -68,6 +68,14 @@ def candidates(aig, forwarding, node, source):
     return list(filter(filter_candidates, candidates))
 
 
+def is_candidate(forwarding, node, source, c):
+    return (
+        _full(forwarding, source, c) == False and # Majority Support
+        _is_output(forwarding, c) == False and # Outputs cannot forward information
+        _reachable(forwarding, node, c) == False and # Prevent cycles
+        c != node # Can't forward to himself
+    )
+
 def slots(aig):
     forwarding = aig if isinstance(aig, nx.MultiDiGraph) else nx.MultiDiGraph(aig)
     outputs = set(node for node in forwarding.nodes() if all(False for _ in forwarding.successors(node)))

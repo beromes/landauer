@@ -313,6 +313,47 @@ def _reproduce(aig, population, rate, strategy):
 
     return children[:n_children], n_invalids, n_invalid_items / n_items
 
+
+# Faz reprodução comparando gene a gene. Evita criação de indivíduos inválidos
+def _old_reproduce(aig, population, rate):
+
+    def crossover(p1, p2):
+        # Cria filho a partir da cópia dos pais
+        child = Individual(p1.assignment.copy(), p1.forwarding.copy())
+
+        for key, current_value in p1.assignment.items():
+            incoming_value = p2.assignment[key]
+
+            # Se a informação for a mesma em ambos os pais, não faz nada
+            if current_value == incoming_value:
+                continue
+
+            # Verifica se é possível trocar a informação
+            if placement.is_candidate(child.forwarding, key[0], key[1], incoming_value):
+                # Faz a troca do gene pela informação do segundo pai
+                child.assignment, child.forwarding = _replace(aig, child.assignment, child.forwarding, key, incoming_value)
+
+        return child
+
+    n_children = int(len(population) * rate)
+    children = []
+
+    # Ordena a população e define os pesos
+    ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
+    weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
+    weights = weights / np.sum(weights) # divide pela soma dos pesos para que a soma total seja 1
+
+    while len(children) < n_children:
+        # Escolhe os parentes
+        p1, p2 = np.random.choice(ordered_population, 2, replace=False, p=weights) # Escolhe dois parentes sem reposição
+
+        # Cria filhos a partir da cópia dos pais
+        children.append(crossover(p1, p2))
+        children.append(crossover(p2, p1))
+
+    return children[:n_children], 0, 0
+
+
 # Aplica mutacao nos individuos de uma populacao
 def _mutate(aig, population, rate, intensity):
     mutated_pop = []
