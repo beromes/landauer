@@ -21,8 +21,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 '''
-
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import seaborn as sns
 
 from collections import deque
@@ -47,11 +47,13 @@ class Plot:
         self.palette.rotate()
         return color
 
-    def plot_samples(self, samples, label, color = None, marker = 'o'):
+    def plot_samples(self, samples, label, color = None, marker = 'o', legend=True):
         self.samples.update(samples)
         self.ax.scatter([sample[0] for sample in samples],
             [sample[1] for sample in samples], c = color if color else self._next_color(), label = label, marker = marker)
-        self.ax.legend()
+
+        if legend:
+            self.ax.legend()
 
     def plot_summary(self, summary, label):
         self.plot_samples([(summary['entropy_losses'], summary['depth'])], label)
@@ -69,10 +71,25 @@ class Plot:
         self.plot_energy_oriented(aig, entropy_data)
         self.plot_depth_oriented(aig, entropy_data)
 
-    def plot_pareto(self):
+    def plot_pareto(self, legend=True):
         samples = list(sorted(self.samples))
         frontier = [samples[0]]
         for sample in samples[1:]:
             if sample[1] < frontier[-1][1]:
                 frontier.append(sample)
-        self.plot_samples(frontier, 'Pareto', 'black', 'x')
+        self.plot_samples(frontier, 'Pareto', 'black', 'x', legend=legend)
+
+    def plot_pareto_evolution(self, samples_by_generation, label): 
+        def update(i):
+            samples = samples_by_generation[i]
+            self.plot_samples(samples, label, color='b', legend=False)
+            self.plot_pareto(legend=False)
+            plt.title(f'Epoch {i}')
+
+        # Compute interval so the final animation has 10s
+        size = len(samples_by_generation)                
+        interval = min(10000 / size, 1000)
+
+        animation_fig = animation.FuncAnimation(self.fig, update, frames=size, interval=interval)
+        animation_fig.save("tmp/pareto-frontier.gif")
+        plt.show()
