@@ -22,7 +22,6 @@ SOFTWARE.
 
 '''
 
-import landauer.parse as parse
 import landauer.entropy as entropy
 import landauer.evaluate as evaluate
 import landauer.algorithms.naive as naive
@@ -32,13 +31,9 @@ import landauer.placement as placement
 import networkx as nx
 import numpy as np
 import random
-import json
 import time
 from operator import attrgetter
 from enum import Enum, auto
-import pprint
-
-from functools import reduce
 
 '''
 Classes/Modelos
@@ -211,38 +206,6 @@ def _reproduce(aig, population, rate, strategy):
 
         return Individual(assignment, forwarding), n_invalid_items
 
-    # Corrige o invidíduo após juntar as duas partes
-    # def make_individual(aig, assignment):
-    #     forwarding = _forwarding(aig, assignment)
-    #     invalid_edges = list(assignment.items())
-
-    #     while len(invalid_edges) > 0:
-    #         new_invalid_edges = []
-
-    #         for (key, value) in invalid_edges:
-                
-    #             if is_valid(forwarding, key[0], value):
-    #                 continue
-                
-    #             candidates = placement.candidates(aig, forwarding, key[0], key[1])
-    #             if (len(candidates) == 0):
-    #                 new_invalid_edges.append((key, value))
-    #                 continue
-
-    #             new_value = random.choice(candidates)
-    #             assignment, forwarding = _replace(aig, assignment, forwarding, key, new_value)
-
-    #         # Caso entre em loop e não consiga resolver as divergências, retorna nulo
-    #         if (invalid_edges == new_invalid_edges):
-    #             if debug:
-    #                 print('[ERROR] Loop detectado - Indivíduo descartada')
-    #             return None;
-
-    #         invalid_edges = new_invalid_edges
-
-    #     return Individual(assignment, forwarding)
-
-
     n_children = int(len(population) * rate)
     children = []
 
@@ -276,40 +239,6 @@ def _reproduce(aig, population, rate, strategy):
             invalids = n_invalid_items1 + n_invalid_items2
             n_edges = len(child1.assignment.items()) * 2
             print('[ERROR] Atribuições invalidas na reprodução: ', invalids, (invalids / n_edges) * 100)
-
-        # # Cria filhos a partir da combinação dos genes dos pais
-        # # TODO: Explorar estratégia que gera até 4 filhos
-        # child1, child2 = p1.assignment.copy(), p2.assignment.copy()
-        # child1.update(splitted_p2[1])
-        # child2.update(splitted_p1[1])
-
-        # # TODO: Remover prints quando ficarem irrelevantes
-        # for key in p1.assignment.keys():
-        #     if key not in child1.keys():
-        #         print('ERRO: Está em p1 mas não em child1', key)
-
-        # for key in child1.keys():
-        #     if key not in p1.assignment.keys():
-        #         print('ERRO: Está em child1 mas não em p1', key)
-
-        # for i in range(len(p1.assignment.keys())):
-        #     if list(p1.assignment.keys())[i] != list(child1.keys())[i]:
-        #         print('ERRO: Não estão na mesma ordem!', i)
-
-        # i1, i2 = make_individual(aig, child1), make_individual(aig, child2)
-
-        # if i1 is not None:
-        #     children.append(i1)
-        # else:
-        #     n_invalids += 1
-        
-        # if i2 is not None:
-        #     children.append(i2)
-        # else:
-        #     n_invalids += 1
-
-    # if debug:
-    #     print('[ERROR] Soluções inválidas: ', n_invalids, n_invalids / n_children)
 
     return children[:n_children], n_invalids, n_invalid_items / n_items
 
@@ -380,10 +309,6 @@ def _mutate(aig, population, rate, intensity):
             
             # Se for diferente, atualiza o indivíduo
             if (choosed != i.assignment[(gate, input_)]):
-                # Remove aresta antiga do grafo e adiciona a nova
-                # i.forwarding.remove_edge(i.assignment[(gate, input_)], gate)
-                # i.forwarding.add_edge(choosed, gate)
-                # Atualiza assignment
                 i.assignment[(gate, input_)] = choosed
                 i.forwarding = _forwarding(aig, i.assignment)
 
