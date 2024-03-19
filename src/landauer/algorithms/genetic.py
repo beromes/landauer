@@ -45,8 +45,6 @@ class CrossoverStrategy(Enum):
 
 class ParamMap:
     name = 'Padrao'
-    w_energy = 1
-    w_delay = 0
     n_generations = 600
     n_initial_individuals = 50
     reproduction_rate = 1.0
@@ -63,12 +61,21 @@ class ParamMap:
 class Individual:
     assignment = None
     forwarding = None
-    score = 0
+    entropy_loss = 0
     delay = 0
+    rank: int = None
+    domination_count: int = None
+    dominates: list['Individual'] = None
+    crowdy_distance: float = None
 
     def __init__(self, assignment, forwarding):
         self.assignment = assignment
         self.forwarding = forwarding
+
+    def is_dominated_by(self, other: 'Individual') -> bool:
+        if self.entropy_loss == other.entropy_loss and self.delay == other.delay:
+            return False
+        return other.entropy_loss <= self.entropy_loss and other.delay <= self.delay
 
 '''
 Funcoes auxiliares
@@ -87,10 +94,6 @@ def _get_naive_point(aig, strategy):
     print('Energy: ' + str(evaluation_naive['total']))
     print('Delay: ' + str(_calc_delay(aig_naive)))
     return naive_point
-
-def _get_single_edge(aig, u, v):
-    edges = [key for key in aig.succ[u].get(v, dict()).keys() if not aig.edges[u, v, key].get('forward', False)]
-    return edges[0] if len(edges) == 1 else None
 
 def _assignment(aig):
     assignment_ = dict()
@@ -149,12 +152,97 @@ def _init_population(aig, n_individuals):
 
     return population
 
-# Calcula o score baseado na perda de entropia, também calcula o delay
-def _fit(population, entropy_s):
-    for p in population:
-        evaluation = evaluate.evaluate(p.forwarding, entropy_s)
-        p.score = evaluation['total']
-        p.delay = _calc_delay(p.forwarding)
+# Calcula perda de entropia e delay para os novos indivíduos e computa o rank de toda a população
+def _fit_and_selection(cur_pop: list[Individual], new_gen: list[Individual], entropy_s):
+
+    def fast_non_dominated_sort(population: list[Individual]) -> list[list[Individual]]:
+
+        # Cria uma lista de ranks. Cada item da lista corresponde a um rank
+        ranks = []
+        front = []
+
+        # Para cada indivíduo, calcula por quantos indivíduos ele é dominado e quais ele domina
+        for ind in population:
+            ind.domination_count = 0
+            ind.dominates = []
+            for other in population:
+                if ind.is_dominated_by(other):
+                    ind.domination_count += 1
+                elif other.is_dominated_by(ind):
+                    ind.dominates.append(other)
+
+            if (ind.domination_count == 0):
+                ind.rank = 1
+                front.append(ind)
+
+        while len(front) > 0:
+            ranks.append(front)
+            next_front = [] # Proxima fronteira 
+            for ind in front:
+                for dominated_ind in ind.dominates:
+                    dominated_ind.domination_count -= 1
+                    if dominated_ind.domination_count == 0:
+                        dominated_ind.rank = len(ranks) + 1
+                        next_front.append(dominated_ind)
+                            
+            front = next_front
+
+        return ranks
+
+    # Calcula crowdy distance para o solucoes de um determinado rank
+    def crowding_distance_assignment(samples: list[Individual]):
+        for s in samples:
+            s.crowdy_distance = 0
+
+        objectives = ['entropy_loss', 'delay']
+
+        # Acessa um objetivo de acordo com o parametro
+        def objective(i: Individual, obj: str):
+            if obj == 'entropy_loss': return i.entropy_loss
+            if obj == 'delay': return i.delay
+            return None
+
+        for obj in objectives:
+
+            # Ordena pelo objetivo: do menor para o maior
+            samples.sort(key=lambda x: objective(x, obj)) # TODO: Testar se ordenacao funciona
+
+            # Identifica diferenca entre os valores extremos para normalizacao
+            max_diff = objective(samples[-1], obj) - objective(samples[0], obj)
+
+            # Pontos extremos tem distancia infinita
+            samples[0].crowdy_distance = float('inf')
+            samples[-1].crowdy_distance = float('inf')
+
+            for i in range(1, len(samples) - 1):
+                samples[i].crowdy_distance = samples[i].crowdy_distance + ((objective(samples[i+1], obj) - objective(samples[i-1], obj)) / (max_diff))
+
+    # Calcula perda de entropia e delay para os novos indivíduos
+    for i in new_gen:
+        evaluation = evaluate.evaluate(i.forwarding, entropy_s)
+        i.entropy_loss = float(evaluation['total'])
+        i.delay = _calc_delay(i.forwarding)
+
+    # Combina populacao antiga com nova geração e separa por ranks
+    ranks = fast_non_dominated_sort(cur_pop + new_gen)
+
+    # Calcula crowdy distance para cada rank até preencher o tamanho da população
+    pop_size = len(new_gen) # Tamanho da nova população é igual o da anterior    
+    pop, i = [], 0
+    while len(pop) < pop_size:
+        crowding_distance_assignment(ranks[i]) # Calcula crowdy distance
+
+        # Verifica se cabe o novo rank inteiro
+        if (len(pop) + len(ranks[i]) <= pop_size):            
+            pop += ranks[i] # Adiciona individuos na populacao
+            i += 1 # Passa para o próximo rank
+
+        # Completa espacos restantes na populacao com base em crowdy distance
+        else:
+            ranks[i].sort(key=lambda x: x.crowdy_distance, reverse=True)
+            pop += ranks[i][0:pop_size - len(pop)]
+
+    return pop
 
 # Faz reprodução dos individuos de uma populacao
 def _reproduce(aig, population, rate, strategy):
@@ -205,14 +293,17 @@ def _reproduce(aig, population, rate, strategy):
                 n_invalid_items += 1
 
         return Individual(assignment, forwarding), n_invalid_items
+    
+    def tournament_selection(population: list[Individual]):
+        c1, c2 = np.random.choice(population, 2, replace=False)
+        if c1.rank == c2.rank:
+            return c1 if c1.crowdy_distance >= c2.crowdy_distance else c2
+        else:
+            return c1 if c1.rank < c2.rank else c2
+
 
     n_children = int(len(population) * rate)
     children = []
-
-    # Ordena a população e define os pesos
-    ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
-    weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
-    weights = weights / np.sum(weights) # divide pela soma dos pesos para que a soma total seja 1
 
     # Conta número de soluções inválidas
     n_invalids = 0
@@ -223,7 +314,8 @@ def _reproduce(aig, population, rate, strategy):
 
     while len(children) < n_children:
         # Escolhe os parentes
-        p1, p2 = np.random.choice(ordered_population, 2, replace=False, p=weights) # Escolhe dois parentes sem reposição
+        p1 = tournament_selection(population)
+        p2 = tournament_selection(population)
 
         # Separa os genes de acordo com a estratégia
         splitted_p1 = split_assignment(p1, strategy)
@@ -268,7 +360,7 @@ def _old_reproduce(aig, population, rate):
     children = []
 
     # Ordena a população e define os pesos
-    ordered_population = sorted(population, key=lambda p: p.score, reverse=True)
+    ordered_population = sorted(population, key=lambda p: p.entropy_loss, reverse=True)
     weights = list(range(1, len(population) + 1)) # Peso é baseado na ordem
     weights = weights / np.sum(weights) # divide pela soma dos pesos para que a soma total seja 1
 
@@ -315,17 +407,6 @@ def _mutate(aig, population, rate, intensity):
         mutated_pop.append(i)
     return mutated_pop
 
-# Seleciona os individuos mais adaptados
-def _natural_selection(old_generation, new_generation, elitism_rate):
-    old_generation = sorted(old_generation, key=lambda p: p.score, reverse=True)
-    new_generation = sorted(new_generation, key=lambda p: p.score, reverse=True)
-
-    n_old_individuals = int(len(old_generation) * elitism_rate)
-    n_new_individuals = len(new_generation) - n_old_individuals
-
-    return old_generation[n_old_individuals:] + new_generation[n_new_individuals:]
-
-
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
@@ -345,10 +426,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         seed = random.randrange(2**32)
     random.seed(seed)
     np.random.seed(seed)
-
-    # Valida entradas
-    if params.w_delay + params.w_energy != 1:
-        raise ValueError("A soma dos pesos deve ser igual a 1")
 
     # Simula circuito
     entropy_s = entropy_data
@@ -382,7 +459,7 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     _log('Definir população inicial')
 
     # Passo 2 - Aplicar funcao fitness na populacao inicial
-    _fit(population, entropy_s)
+    population = _fit_and_selection([], population, entropy_s)
     _log('Avaliar a população inicial')
     
     # Inicia conjunto com todas as soluções
@@ -396,15 +473,15 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
             break
 
         # Encontra melhor e pior
-        best = min(population, key=attrgetter('score'))
-        worst = max(population, key=attrgetter('score'))
-        evolutionary_results['global_best'].append(best.score)        
+        best = min(population, key=attrgetter('entropy_loss'))
+        worst = max(population, key=attrgetter('entropy_loss'))
+        evolutionary_results['global_best'].append(best.entropy_loss)        
         if (i == 0):
-            evolutionary_results['generation_best'].append(best.score)
-            evolutionary_results['generation_worst'].append(worst.score)
+            evolutionary_results['generation_best'].append(best.entropy_loss)
+            evolutionary_results['generation_worst'].append(worst.entropy_loss)
 
-        if show_debug_messages:
-            print(str(i) + " - Melhor: " + str(best.score) + " - Pior: " + str(worst.score))
+        #if show_debug_messages:
+        print(str(i) + " - Melhor: " + str(best.entropy_loss) + " - Pior: " + str(worst.entropy_loss))
 
         # Passo 3 - Reprodução
         new_generation, new_invalids, percentual_invalid_items = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
@@ -415,19 +492,15 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         _log('Mutação')
 
         # Passo 5 - Fitness
-        _fit(new_generation, entropy_s)
-        _log('Fitness')
-
-        # Passo 6 - Seleção natural
-        population = _natural_selection(population, new_generation, params.elitism_rate)
-        _log('Seleção natural')
+        population = _fit_and_selection(population, new_generation, entropy_s)
+        _log('Fitness & Seleção')
 
         # Adiciona novas soluções
         all_individuals = all_individuals.union(set(new_generation))
 
         # Salva os resultados da geração
-        evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('score')).score)
-        evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('score')).score)
+        evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('entropy_loss')).entropy_loss)
+        evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('entropy_loss')).entropy_loss)
         evolutionary_results['solutions'].append(set(new_generation))
 
         # Conta novos indivíduos inválidos
@@ -437,18 +510,18 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         sum_percentual_invalid_items += percentual_invalid_items
 
     # Encontra melhor solução geral
-    best = min(population, key=attrgetter('score'))
-    evolutionary_results['global_best'].append(best.score)
+    best = min(population, key=attrgetter('entropy_loss'))
+    evolutionary_results['global_best'].append(best.entropy_loss)
 
     print("==== Melhor Solução ====")
-    energy_score = 1 - (best.score / initial_energy)
+    energy_score = 1 - (best.entropy_loss / initial_energy)
     delay_score = 1 - (best.delay / initial_delay)
-    print('Energia: ' + str(best.score) + '(' + str(energy_score) + '%)')
+    print('Energia: ' + str(best.entropy_loss) + '(' + str(energy_score) + '%)')
     print('Delay: ' + str(best.delay) + '(' + str(delay_score) + '%)')
 
     # Plota resultados
     if plot_results:
-        points = np.array([[i.score, i.delay] for i in all_individuals])
+        points = np.array([[i.entropy_loss, i.delay] for i in all_individuals])
         naive_points = [_get_naive_point(aig, naive.Strategy.ENERGY_ORIENTED), _get_naive_point(aig, naive.Strategy.DEPTH_ORIENTED)]
         pf.find_pareto_frontier(points, naive_points, plot=True)
         pf.evolution_over_generations(evolutionary_results)
