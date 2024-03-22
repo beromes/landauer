@@ -521,9 +521,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
 
     # Plota resultados
     if plot_results:
-        points = np.array([[i.entropy_loss, i.delay] for i in all_individuals])
-        naive_points = [_get_naive_point(aig, naive.Strategy.ENERGY_ORIENTED), _get_naive_point(aig, naive.Strategy.DEPTH_ORIENTED)]
-        pf.find_pareto_frontier(points, naive_points, plot=True)
         pf.evolution_over_generations(evolutionary_results)
 
     # Plota circuito
