@@ -208,7 +208,7 @@ def _fit_and_selection(cur_pop: list[Individual], new_gen: list[Individual], ent
             samples.sort(key=lambda x: objective(x, obj)) # TODO: Testar se ordenacao funciona
 
             # Identifica diferenca entre os valores extremos para normalizacao
-            max_diff = objective(samples[-1], obj) - objective(samples[0], obj)
+            max_diff = max(objective(samples[-1], obj) - objective(samples[0], obj), 1)
 
             # Pontos extremos tem distancia infinita
             samples[0].crowdy_distance = float('inf')

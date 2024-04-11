@@ -32,6 +32,9 @@ import sys
 from timeit import default_timer as timer
 from tqdm import tqdm
 
+def bit_count(self):
+    return bin(self).count("1")
+
 def _input_generator():
     yield itertools.cycle((0x5555555555555555,))
     yield itertools.cycle((0x3333333333333333,))
@@ -61,7 +64,7 @@ def _count(variables, buffer, mask):
         result = mask
         for variable, pattern in zip(variables, product):
             result = result & ~(buffer[variable] ^ pattern)
-        counter[product] = result.bit_count()
+        counter[product] = bit_count(result)
     return counter
 
 def _simulate(aig, constants, mask):
