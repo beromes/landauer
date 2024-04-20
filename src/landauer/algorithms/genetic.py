@@ -407,6 +407,12 @@ def _mutate(aig, population, rate, intensity):
         mutated_pop.append(i)
     return mutated_pop
 
+
+def _get_n_discovered_pareto(pop: list[Individual]):
+    nondominated = list(filter(lambda p: p.rank == 1, pop))
+    unique = set(map(lambda p: str(p.entropy_loss) + '-' + str(p.delay), nondominated))
+    return len(unique)
+
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
@@ -480,8 +486,8 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
             evolutionary_results['generation_best'].append(best.entropy_loss)
             evolutionary_results['generation_worst'].append(worst.entropy_loss)
 
-        #if show_debug_messages:
-        print(str(i) + " - Melhor: " + str(best.entropy_loss) + " - Pior: " + str(worst.entropy_loss))
+        if show_debug_messages:
+            print(str(i) + " - Melhor: " + str(best.entropy_loss) + " - Pior: " + str(worst.entropy_loss))
 
         # Passo 3 - Reprodução
         new_generation, new_invalids, percentual_invalid_items = _reproduce(aig, population, params.reproduction_rate, params.crossover_strategy)
@@ -499,9 +505,9 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         all_individuals = all_individuals.union(set(new_generation))
 
         # Salva os resultados da geração
-        evolutionary_results['generation_worst'].append(max(new_generation, key=attrgetter('entropy_loss')).entropy_loss)
-        evolutionary_results['generation_best'].append(min(new_generation, key=attrgetter('entropy_loss')).entropy_loss)
-        evolutionary_results['solutions'].append(set(new_generation))
+        evolutionary_results['generation_worst'].append(max(population, key=attrgetter('entropy_loss')).entropy_loss)
+        evolutionary_results['generation_best'].append(min(population, key=attrgetter('entropy_loss')).entropy_loss)
+        evolutionary_results['solutions'].append(set(population))
 
         # Conta novos indivíduos inválidos
         n_invalids += new_invalids
@@ -534,5 +540,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'seed': seed,
         'execution_time': time.time() - initial_time,
         'n_invalids': n_invalids,
-        'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best'])
+        'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best']),
+        'n_discovered_pareto': _get_n_discovered_pareto(evolutionary_results['solutions'][-1])
     }
