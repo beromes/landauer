@@ -408,10 +408,18 @@ def _mutate(aig, population, rate, intensity):
     return mutated_pop
 
 
-def _get_n_discovered_pareto(pop: list[Individual]):
-    nondominated = list(filter(lambda p: p.rank == 1, pop))
-    unique = set(map(lambda p: str(p.entropy_loss) + '-' + str(p.delay), nondominated))
-    return len(unique)
+def _get_pareto_info(pop: list[Individual]):
+    pareto = list(filter(lambda p: p.rank == 1, pop))
+    n_discovered = len(set(map(lambda p: str(p.entropy_loss) + '-' + str(p.delay), pareto)))
+
+    pareto.sort(key=lambda p: p.entropy_loss)
+
+    return {
+        'n_discovered': n_discovered,
+        'min_entropy_loss': pareto[0],
+        'min_delay': pareto[-1],
+        'middle': pareto[len(pareto) // 2]
+    }
 
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
@@ -541,5 +549,5 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'execution_time': time.time() - initial_time,
         'n_invalids': n_invalids,
         'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best']),
-        'n_discovered_pareto': _get_n_discovered_pareto(evolutionary_results['solutions'][-1])
+        'pareto_info': _get_pareto_info(evolutionary_results['solutions'][-1])
     }
