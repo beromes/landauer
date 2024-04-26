@@ -529,6 +529,9 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     if plot_circuit:
         graph.show(graph.default(best.forwarding))
 
+
+    n_executed_generations = len(evolutionary_results['generation_best'])
+
     return { 
         'best_solution': best, 
         'solutions': all_individuals,
@@ -536,5 +539,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'seed': seed,
         'execution_time': time.time() - initial_time,
         'n_invalids': n_invalids,
-        'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best'])
+        'percentual_invalid_items': sum_percentual_invalid_items / max(n_executed_generations, 1),
+        'n_executed_generations': n_executed_generations
     }
