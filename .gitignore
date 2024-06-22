@@ -4,3 +4,5 @@ dist/
 env/
 src/landauer.egg-info
 designs/
+output/
+*.DS_Store

@@ -83,7 +83,7 @@ Funcoes auxiliares
 def _calc_delay(aig):
     return len(nx.dag_longest_path(aig)) - 2
 
-def _get_naive_point(aig, strategy):
+def get_naive_point(aig, strategy):
     entropy_s = entropy.entropy(aig)
     aig_naive = naive.naive(aig, strategy)
     assignment_naive = _assignment(aig_naive)
@@ -541,6 +541,8 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     if plot_circuit:
         graph.show(graph.default(best.forwarding))
 
+    n_executed_generations = len(evolutionary_results['generation_best'])
+
     return { 
         'best_solution': best, 
         'solutions': all_individuals,
@@ -549,5 +551,6 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         'execution_time': time.time() - initial_time,
         'n_invalids': n_invalids,
         'percentual_invalid_items': sum_percentual_invalid_items / len(evolutionary_results['generation_best']),
+        'n_executed_generations': n_executed_generations,
         'pareto_info': _get_pareto_info(evolutionary_results['solutions'][-1])
     }

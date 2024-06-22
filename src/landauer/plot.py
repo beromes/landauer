@@ -47,25 +47,31 @@ class Plot:
         self.palette.rotate()
         return color
 
-    def plot_samples(self, samples, label, color = None, marker = 'o', legend=True):
+    def plot_samples(self, samples, label, color = None, marker = 'o', legend=True, edgecolor = None, linewidth = None, size = 50):
         self.samples.update(samples)
         self.ax.scatter([sample[0] for sample in samples],
-            [sample[1] for sample in samples], c = color if color else self._next_color(), label = label, marker = marker)
+            [sample[1] for sample in samples], c = color if color else self._next_color(),
+            label = label,
+            marker = marker,
+            edgecolor = edgecolor,
+            linewidth = linewidth,
+            s=size
+        )
 
         if legend:
             self.ax.legend()
 
-    def plot_summary(self, summary, label):
-        self.plot_samples([(summary['entropy_losses'], summary['depth'])], label)
+    def plot_summary(self, summary, label, marker = 'o'):
+        self.plot_samples([(summary['entropy_losses'], summary['depth'])], label, color='white', marker=marker, edgecolor='black', linewidth=1)
 
     def plot_original(self, aig, entropy_data):
         self.plot_summary(summary.summary(aig, entropy_data), 'Original')
 
     def plot_energy_oriented(self, aig, entropy_data):
-        self.plot_summary(summary.summary(naive.naive(aig, naive.Strategy.ENERGY_ORIENTED), entropy_data), 'Energy oriented')
+        self.plot_summary(summary.summary(naive.naive(aig, naive.Strategy.ENERGY_ORIENTED), entropy_data), 'Energy-Oriented', '^')
     
     def plot_depth_oriented(self, aig, entropy_data):
-        self.plot_summary(summary.summary(naive.naive(aig, naive.Strategy.DEPTH_ORIENTED), entropy_data), 'Depth oriented')
+        self.plot_summary(summary.summary(naive.naive(aig, naive.Strategy.DEPTH_ORIENTED), entropy_data), 'Depth-Oriented', 'o')
         
     def plot_naive(self, aig, entropy_data):
         self.plot_energy_oriented(aig, entropy_data)
@@ -77,7 +83,7 @@ class Plot:
         for sample in samples[1:]:
             if sample[1] < frontier[-1][1]:
                 frontier.append(sample)
-        self.plot_samples(frontier, 'Pareto', 'black', 'x', legend=legend)
+        self.plot_samples(frontier, 'Pareto', None, 'x', legend=legend, linewidth=2)
 
     def plot_pareto_evolution(self, samples_by_generation, label): 
         def update(i):

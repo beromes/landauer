@@ -194,6 +194,15 @@ def show(dot):
     plt.axis('off')
     plt.show()
 
+def save(dot, filename):
+    graphs = pydot.graph_from_dot_data(dot.source)
+    graph = graphs[0]
+    image = Image.open(BytesIO(graph.create_png()))
+    plt.imshow(image)
+    plt.axis('off')
+    plt.savefig(filename, dpi=300)
+    plt.show()
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--show', help="show graph using matplotlib", action="store_true")
