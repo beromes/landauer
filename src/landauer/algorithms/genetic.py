@@ -76,6 +76,14 @@ class Individual:
         if self.entropy_loss == other.entropy_loss and self.delay == other.delay:
             return False
         return other.entropy_loss <= self.entropy_loss and other.delay <= self.delay
+    
+
+    def compress(self):
+        i = Individual(self.assignment, None)
+        i.entropy_loss = self.entropy_loss
+        i.delay = self.delay
+        i.rank = self.rank
+        return i
 
 '''
 Funcoes auxiliares
@@ -421,6 +429,9 @@ def _get_pareto_info(pop: list[Individual]):
         'middle': pareto[len(pareto) // 2]
     }
 
+def compress_population(pop: list[Individual]):
+    return set(map(lambda p: p.compress(), pop))
+
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
@@ -477,8 +488,8 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     _log('Avaliar a população inicial')
     
     # Inicia conjunto com todas as soluções
-    all_individuals = set(population)
-    evolutionary_results['solutions'].append(set(population))
+    all_individuals = compress_population(population)
+    evolutionary_results['solutions'].append(compress_population(population))
 
     for i in range(params.n_generations):
 
@@ -510,12 +521,12 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
         _log('Fitness & Seleção')
 
         # Adiciona novas soluções
-        all_individuals = all_individuals.union(set(new_generation))
+        all_individuals = all_individuals.union(compress_population(new_generation))
 
         # Salva os resultados da geração
         evolutionary_results['generation_worst'].append(max(population, key=attrgetter('entropy_loss')).entropy_loss)
         evolutionary_results['generation_best'].append(min(population, key=attrgetter('entropy_loss')).entropy_loss)
-        evolutionary_results['solutions'].append(set(population))
+        evolutionary_results['solutions'].append(compress_population(population))
 
         # Conta novos indivíduos inválidos
         n_invalids += new_invalids

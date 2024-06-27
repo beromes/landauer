@@ -115,23 +115,28 @@ def save_netlists(solutions):
 
 # Define benchmarks que serão utilizados
 benchmarks = [
-    ('mcnc', 'newtag'),
+    # ('mcnc', 'newtag'),
     ('mcnc', 'newtpla'),
-    ('mcnc', 'z4ml'),
-    ('mcnc', 'x2'),
-    ('mcnc', 'm1'),
+    # ('mcnc', 'z4ml'),
+    # ('mcnc', 'x2'),
+    # ('mcnc', 'm1'),
+    
     #('epfl', 'log2'),
     #('epfl', 'sin'),
-    ('epfl', 'cavlc'),
-    ('epfl', 'dec'),
-    ('epfl', 'int2float'),
-    ('epfl', 'ctrl'),
-    ('mcnc', 'prom1'),
+
+    # ('epfl', 'cavlc'),
+    # ('epfl', 'dec'),
+    # ('epfl', 'int2float'),
+    # ('epfl', 'ctrl'),
+    #('mcnc', 'prom1'),
+    
     #('mcnc', 'mainpla'),
     #('mcnc', 'xparc'),
-    ('mcnc', 'bca'),
-    ('mcnc', 'prom2'),
-    ('mcnc', 'apex4'),
+    
+    #('mcnc', 'bca'),
+    #('mcnc', 'prom2'),
+    #('mcnc', 'apex4'),
+
     ('mcnc', 'ex1010'),
     ('mcnc', 'bcb'),
     ('mcnc', 'bcc'),
@@ -195,16 +200,16 @@ for i in range(n_exec):
         results = exec_ga(aig, entropy_data)
 
         # Armazena individuos produzidos
-        solutions = list(map(lambda x: x.forwarding, results['solutions']))
+        # solutions = list(map(lambda x: x.forwarding, results['solutions']))
 
         # Armazena metricas
         save_results(benchmark, circuit, i, results, multi_objective=True)
 
         # Armazena imagem do pareto
         samples = list()
-        for forwarding in solutions:
-            details = summary.summary(forwarding, entropy_data)
-            samples.append((details['entropy_losses'], details['depth']))
+        for solution in results['solutions']:
+            #details = summary.summary(forwarding, entropy_data)
+            samples.append((solution.entropy_loss, solution.delay))
 
         plot_pareto(samples, aig, entropy_data)
         plt.savefig('output/pareto/multi-objective/' + benchmark.replace('/', '_') + '-' + circuit + '-' + str(i) + '.png')
@@ -215,5 +220,5 @@ for i in range(n_exec):
         #save_netlists(results['solutions'])
 
         # Salva imagem da netlist 
-        middle = results['pareto_info']['middle']
-        graph.save(graph.paper(middle.forwarding), 'output/netlists/' + benchmark + '-' + circuit + '-' + str(i) + '.png')
+        #middle = results['pareto_info']['middle']
+        #graph.save(graph.paper(middle.forwarding), 'output/netlists/' + benchmark + '-' + circuit + '-' + str(i) + '.png')
