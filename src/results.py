@@ -118,7 +118,7 @@ benchmarks = [
     # ('mcnc', 'newtag'),
     ('mcnc', 'newtpla'),
     # ('mcnc', 'z4ml'),
-    # ('mcnc', 'x2'),
+    ('mcnc', 'x2'),
     # ('mcnc', 'm1'),
     
     #('epfl', 'log2'),
@@ -128,8 +128,8 @@ benchmarks = [
     # ('epfl', 'dec'),
     # ('epfl', 'int2float'),
     # ('epfl', 'ctrl'),
-    #('mcnc', 'prom1'),
     
+    #('mcnc', 'prom1'),    
     #('mcnc', 'mainpla'),
     #('mcnc', 'xparc'),
     
@@ -137,14 +137,14 @@ benchmarks = [
     #('mcnc', 'prom2'),
     #('mcnc', 'apex4'),
 
-    ('mcnc', 'ex1010'),
-    ('mcnc', 'bcb'),
-    ('mcnc', 'bcc'),
+    #('mcnc', 'ex1010'),
+    #('mcnc', 'bcb'),
+    #('mcnc', 'bcc'),
     #('mcnc', 'C6288'),
-    ('mcnc', 'bcd'),
-    ('mcnc', 'table3'),
-    ('mcnc', 'table5'),
-    ('mcnc', 'cps'),
+    #('mcnc', 'bcd'),
+    #('mcnc', 'table3'),
+    #('mcnc', 'table5'),
+    #('mcnc', 'cps'),
 ]
 
 # Cria arquivos de entropia
@@ -187,7 +187,7 @@ param_map = {
 n_exec = 5
 
 # Para cada execução
-for i in range(n_exec):
+for i in range(3, n_exec):
 
     # Para cada circuito
     for (benchmark, circuit) in benchmarks:
