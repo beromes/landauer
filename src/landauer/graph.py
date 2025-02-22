@@ -194,14 +194,16 @@ def show(dot):
     plt.axis('off')
     plt.show()
 
-def save(dot, filename):
+def save(dot, filename, title=None):
     graphs = pydot.graph_from_dot_data(dot.source)
     graph = graphs[0]
     image = Image.open(BytesIO(graph.create_png()))
     plt.imshow(image)
     plt.axis('off')
-    plt.savefig(filename, dpi=300)
-    plt.show()
+    if (title != None):
+        plt.title(title, fontsize=10)
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    #plt.show()
 
 def main():
     argparser = argparse.ArgumentParser()

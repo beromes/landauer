@@ -28,12 +28,16 @@ import landauer.algorithms.naive as naive
 import landauer.graph as graph
 import landauer.pareto_frontier as pf
 import landauer.placement as placement
+import landauer.plot as plot
+import landauer.summary as summary
 import networkx as nx
 import numpy as np
 import random
 import time
 from operator import attrgetter
 from enum import Enum, auto
+import csv
+import matplotlib.pyplot as plt
 
 '''
 Classes/Modelos
@@ -89,7 +93,7 @@ class Individual:
 Funcoes auxiliares
 '''
 def _calc_delay(aig):
-    return len(nx.dag_longest_path(aig)) - 2
+    return len(nx.dag_longest_path(aig))
 
 def get_naive_point(aig, strategy):
     entropy_s = entropy.entropy(aig)
@@ -432,6 +436,65 @@ def _get_pareto_info(pop: list[Individual]):
 def compress_population(pop: list[Individual]):
     return set(map(lambda p: p.compress(), pop))
 
+
+'''
+Salvando imagens do pareto e circuitos para gerar vídeo
+
+'''
+def save_video_results(curPop: list[Individual], all: list[Individual], i: int, aig, entropy_data):
+    
+    def store_results_in_csv(eo, do, balanced, n_pareto):
+        results = [{
+            'n_generation': i,
+            'eo_entropy': eo.entropy_loss,
+            'eo_delay': eo.delay,
+            'do_entropy': do.entropy_loss,
+            'dp_delay': do.delay,
+            'balanced_entropy': balanced.entropy_loss,
+            'balanced_delay': balanced.delay,
+            'n_pareto': n_pareto
+        }]
+
+        with open('output/video-images/samples.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer = csv.DictWriter(file, fieldnames=results[0].keys())
+            writer.writerows(results)
+
+    def get_netlist_title(i: Individual):
+        return 'Entropy Loss: ' + '%.3f'%(i.entropy_loss) + '  Depth: ' + str(i.delay)
+
+    def save_netlists_images(eo, do, balanced):
+        graph.save(graph.paper(eo.forwarding), 'output/video-images/netlists/min_entropy_' + str(i) + '.png', get_netlist_title(eo))
+        graph.save(graph.paper(do.forwarding), 'output/video-images/netlists/min_delay_' + str(i) + '.png', get_netlist_title(do))
+        # graph.save(graph.paper(balanced.forwarding), 'output/video-images/netlists/balanced_' + str(i) + '.png', get_netlist_title(balanced))
+
+    def save_pareto_image(n_generation: int):        
+        samples = list()
+        for solution in all:
+            samples.append((solution.entropy_loss, solution.delay))
+
+        p = plot.Plot()
+        p.plot_samples(samples, 'Genetic Algorithm', legend=False, size=5, color='black')
+        p.plot_naive(aig, entropy_data)
+        p.plot_pareto(samples)
+        plt.title('Generation: ' + str(n_generation))
+        plt.savefig('output/video-images/pareto/pareto_' + str(i) + '.png')
+        plt.cla()
+        plt.clf()
+
+
+    pareto_info = _get_pareto_info(curPop)
+
+    eo, do, balanced = pareto_info['min_entropy_loss'], pareto_info['min_delay'], pareto_info['middle']
+
+    store_results_in_csv(eo, do, balanced, pareto_info['n_discovered'])
+    #if i % 10 == 0:
+        #save_netlists_images(eo, do, balanced)
+
+    if i % 5 == 0:
+        save_pareto_image(i)
+        print(i)
+
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
     # Variável booleana que é define quando serão exibidas as mensagens de debug
@@ -492,6 +555,8 @@ def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=Fals
     evolutionary_results['solutions'].append(compress_population(population))
 
     for i in range(params.n_generations):
+
+        #save_video_results(population, all_individuals, i, aig, entropy_data)
 
         if time.time() - initial_time > timeout:
             _log('Timeout!')
