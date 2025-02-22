@@ -430,7 +430,8 @@ def _get_pareto_info(pop: list[Individual]):
     }
 
 def compress_population(pop: list[Individual]):
-    return set(map(lambda p: p.compress(), pop))
+    # return set(map(lambda p: p.compress(), pop))
+    return set(map(lambda p: p, pop))
 
 def genetic(aig, entropy_data, params, seed=None, timeout=300, plot_results=False, plot_circuit=False, show_debug_messages=False):
 
